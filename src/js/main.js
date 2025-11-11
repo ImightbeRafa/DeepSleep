@@ -50,7 +50,16 @@ if (paymentMethodSelect && paymentInfoBox) {
             paymentInfoBox.innerHTML = `
                 <div class="payment-instructions sinpe">
                     <h4>📱 Instrucciones SINPE Móvil</h4>
-                    <p><strong>Importante:</strong> Use el nombre de su orden en el concepto del SINPE para verificar el pago.</p>
+                    <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #0ea5e9;">
+                        <p style="margin: 5px 0;"><strong>📱 Número:</strong> <span style="font-size: 1.2em; color: #0369a1;">7033-9763</span></p>
+                        <p style="margin: 5px 0;"><strong>👤 Nombre:</strong> Rafael Garcia</p>
+                    </div>
+                    <p><strong>⚠️ Importante:</strong></p>
+                    <ul style="margin: 10px 0; padding-left: 20px;">
+                        <li>Use el número de su orden en el concepto del SINPE</li>
+                        <li>Guarde el comprobante de pago</li>
+                        <li>Envíe el comprobante por WhatsApp al <strong>6201-9914</strong></li>
+                    </ul>
                 </div>
             `;
         } else if (selectedMethod === 'Tarjeta') {

@@ -44,18 +44,26 @@ async function sendCustomerEmail(order) {
         </div>
         
         ${order.paymentMethod === 'SINPE' ? `
-          <div style="background: #fef3c7; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <h3>📱 Instrucciones de Pago SINPE</h3>
-            <ol>
+          <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <h3 style="margin-top: 0; color: #92400e;">📱 Instrucciones de Pago SINPE</h3>
+            
+            <div style="background: #fff; padding: 15px; border-radius: 6px; margin: 15px 0;">
+              <p style="margin: 5px 0;"><strong>📱 Número SINPE:</strong> <span style="font-size: 1.3em; color: #0369a1;">7033-9763</span></p>
+              <p style="margin: 5px 0;"><strong>👤 Nombre:</strong> Rafael Garcia</p>
+              <p style="margin: 5px 0;"><strong>💰 Monto:</strong> ₡${order.total.toLocaleString('es-CR')}</p>
+            </div>
+            
+            <p><strong>Pasos a seguir:</strong></p>
+            <ol style="margin: 10px 0; padding-left: 20px;">
               <li>Abra la aplicación SINPE Móvil de su banco</li>
-              <li>Realice una transferencia por <strong>₡${order.total.toLocaleString('es-CR')}</strong></li>
-              <li><strong>Importante:</strong> En el concepto escriba: <strong>${order.orderId}</strong></li>
-              <li>Complete la transferencia</li>
+              <li>Realice la transferencia al número <strong>7033-9763</strong></li>
+              <li><strong>⚠️ Importante:</strong> En el concepto/descripción escriba: <strong>${order.orderId}</strong></li>
+              <li>Guarde el comprobante de pago</li>
+              <li>Envíe el comprobante por WhatsApp al <strong>6201-9914</strong></li>
             </ol>
-            <p><strong>⚠️ Recuerde usar el número de orden en el concepto del SINPE para verificar su pago.</strong></p>
           </div>
         ` : `
-          <p>Su pago con tarjeta ha sido procesado exitosamente.</p>
+          <p>Su pago con tarjeta ha sido procesado exitosamente. ✅</p>
         `}
         
         <div class="order-box">
