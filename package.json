@@ -1,0 +1,22 @@
+{
+  "name": "deepsleep",
+  "version": "1.0.0",
+  "description": "DeepSleep - E-commerce website for anti-snoring mouthguard",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "ecommerce",
+    "deepsleep",
+    "anti-snoring"
+  ],
+  "author": "DeepSleep",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
+
