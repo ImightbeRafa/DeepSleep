@@ -50,7 +50,7 @@ body {
 /* Header */
 .header {
     background-color: var(--color-white);
-    padding: var(--spacing-sm) 0;
+    padding: 0.5rem 0;
     box-shadow: var(--shadow);
     position: sticky;
     top: 0;
@@ -70,8 +70,9 @@ body {
 }
 
 .logo-image {
-    height: 80px;
+    height: 95px;
     width: auto;
+    margin: -0.25rem 0;
 }
 
 .logo-text {
