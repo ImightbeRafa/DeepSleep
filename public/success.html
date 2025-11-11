@@ -149,14 +149,39 @@
     </div>
     
     <script>
-        // Get order ID from URL
+        // Get parameters from URL
         const urlParams = new URLSearchParams(window.location.search);
-        const orderId = urlParams.get('orderId');
+        const orderId = urlParams.get('orderId') || urlParams.get('order');
+        const transactionId = urlParams.get('tilopay-transaction') || urlParams.get('tpt');
+        const code = urlParams.get('code');
         
+        // Display order ID
         if (orderId) {
             document.getElementById('order-number').textContent = orderId;
         } else {
             document.getElementById('order-number').textContent = 'No disponible';
+        }
+        
+        // Confirm payment and send emails
+        if (orderId && code === '1') {
+            fetch('/api/tilopay/confirm', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    orderId: orderId,
+                    transactionId: transactionId,
+                    code: code
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Payment confirmed:', data);
+            })
+            .catch(error => {
+                console.error('❌ Error confirming payment:', error);
+            });
         }
     </script>
 </body>
