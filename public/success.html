@@ -154,6 +154,14 @@
         const orderId = urlParams.get('orderId') || urlParams.get('order');
         const transactionId = urlParams.get('tilopay-transaction') || urlParams.get('tpt');
         const code = urlParams.get('code');
+        const returnData = urlParams.get('returnData');
+        
+        console.log('🔍 URL Parameters:', {
+            orderId,
+            transactionId,
+            code,
+            hasReturnData: !!returnData
+        });
         
         // Display order ID
         if (orderId) {
@@ -163,7 +171,8 @@
         }
         
         // Confirm payment and send emails
-        if (orderId && code === '1') {
+        if (code === '1' && returnData) {
+            console.log('📧 Confirming payment and sending emails...');
             fetch('/api/tilopay/confirm', {
                 method: 'POST',
                 headers: {
@@ -172,16 +181,22 @@
                 body: JSON.stringify({
                     orderId: orderId,
                     transactionId: transactionId,
-                    code: code
+                    code: code,
+                    returnData: returnData
                 })
             })
             .then(response => response.json())
             .then(data => {
                 console.log('✅ Payment confirmed:', data);
+                if (data.success) {
+                    console.log('📧 Emails sent successfully!');
+                }
             })
             .catch(error => {
                 console.error('❌ Error confirming payment:', error);
             });
+        } else {
+            console.warn('⚠️ Missing required parameters:', { code, hasReturnData: !!returnData });
         }
     </script>
 </body>

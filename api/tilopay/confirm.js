@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   console.log('📨 [Confirm] Payment confirmation request');
 
   try {
-    const { orderId, transactionId, code } = req.body;
+    const { orderId, transactionId, code, returnData } = req.body;
 
     if (!orderId) {
       return res.status(400).json({ error: 'Order ID required' });
@@ -31,35 +31,31 @@ export default async function handler(req, res) {
 
     console.log(`📋 [Confirm] Order: ${orderId}, Transaction: ${transactionId}, Code: ${code}`);
 
-    // Get order data from global storage
-    if (!global.pendingOrders) {
-      global.pendingOrders = {};
-    }
-    
-    const order = global.pendingOrders[orderId];
-
-    if (!order) {
-      console.error(`❌ [Confirm] Order not found: ${orderId}`);
-      return res.status(404).json({ 
-        error: 'Order not found',
-        message: 'Order may have expired or does not exist'
-      });
-    }
-
-    // Check if already processed
-    if (order.processed) {
-      console.log(`⚠️ [Confirm] Order already processed: ${orderId}`);
-      return res.json({
-        success: true,
-        message: 'Order already confirmed',
-        alreadyProcessed: true
+    // Decode order data from returnData parameter
+    let order;
+    if (returnData) {
+      try {
+        const decodedData = Buffer.from(returnData, 'base64').toString('utf-8');
+        order = JSON.parse(decodedData);
+        console.log(`✅ [Confirm] Order data decoded from returnData`);
+      } catch (decodeError) {
+        console.error(`❌ [Confirm] Failed to decode returnData:`, decodeError);
+        return res.status(400).json({ 
+          error: 'Invalid order data',
+          message: 'Could not decode order information'
+        });
+      }
+    } else {
+      console.error(`❌ [Confirm] No returnData provided`);
+      return res.status(400).json({ 
+        error: 'Missing order data',
+        message: 'Order information not found in request'
       });
     }
 
     // code=1 means approved
     if (code === '1' || code === 1) {
-      // Mark as processed
-      order.processed = true;
+      // Add payment info to order
       order.paymentStatus = 'completed';
       order.paymentId = transactionId;
       order.paymentMethod = 'Tilopay';

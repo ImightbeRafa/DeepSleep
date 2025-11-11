@@ -10,17 +10,27 @@ async function sendCustomerEmail(order) {
     <head>
       <meta charset="UTF-8">
       <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        h2 { color: #1e40af; }
-        .order-box { background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; }
-        .label { font-weight: bold; color: #1e40af; }
-        .footer { margin-top: 30px; padding-top: 20px; border-top: 2px solid #e5e7eb; font-size: 14px; color: #6b7280; }
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; background: #f9fafb; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; }
+        .header h1 { color: white; margin: 0; font-size: 28px; }
+        .content { padding: 30px; }
+        h2 { color: #1e40af; margin-top: 0; }
+        .order-box { background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea; }
+        .label { font-weight: bold; color: #1e40af; display: inline-block; min-width: 120px; }
+        .footer { margin-top: 30px; padding: 20px 30px; background: #f9fafb; text-align: center; font-size: 14px; color: #6b7280; }
+        .btn { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+        .highlight { background: #fef3c7; padding: 15px; border-radius: 6px; margin: 15px 0; }
       </style>
     </head>
     <body>
       <div class="container">
-        <h2>✅ Confirmación de Pedido - DeepSleep</h2>
+        <div class="header">
+          <h1>😴 DeepSleep</h1>
+          <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Bucal Anti-Ronquidos</p>
+        </div>
+        <div class="content">
+        <h2>✅ ¡Confirmación de Pedido!</h2>
         
         <p>Hola <strong>${order.nombre}</strong>,</p>
         <p>Gracias por tu pedido. Aquí están los detalles:</p>
@@ -48,15 +58,27 @@ async function sendCustomerEmail(order) {
           <p>Su pago con tarjeta ha sido procesado exitosamente.</p>
         `}
         
-        <p><strong>Dirección de Envío:</strong><br>
-        ${order.direccion}<br>
-        ${order.distrito}, ${order.canton}, ${order.provincia}</p>
+        <div class="order-box">
+          <p><strong>📍 Dirección de Envío:</strong></p>
+          <p>${order.direccion}<br>
+          ${order.distrito}, ${order.canton}, ${order.provincia}</p>
+        </div>
+        
+        <p style="text-align: center; margin: 30px 0;">
+          <strong>Te contactaremos pronto para coordinar la entrega</strong>
+        </p>
+        </div>
         
         <div class="footer">
-          <p>Te contactaremos pronto para coordinar la entrega.</p>
-          <p><strong>¿Preguntas?</strong><br>
-          WhatsApp: 6201-9914<br>
-          Instagram: @deepsleep.cr</p>
+          <p><strong>¿Tienes preguntas?</strong></p>
+          <p>
+            WhatsApp: <a href="https://wa.me/50662019914" style="color: #667eea;">6201-9914</a><br>
+            Instagram: <a href="https://www.instagram.com/deepsleep.cr/" style="color: #667eea;">@deepsleep.cr</a><br>
+            Email: deepsleepp.cr@gmail.com
+          </p>
+          <p style="margin-top: 20px; color: #9ca3af;">
+            © 2024 DeepSleep. Todos los derechos reservados.
+          </p>
         </div>
       </div>
     </body>

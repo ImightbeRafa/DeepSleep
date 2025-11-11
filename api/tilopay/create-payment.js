@@ -130,11 +130,27 @@ export default async function handler(req, res) {
     const firstName = nameParts[0] || nombre;
     const lastName = nameParts.slice(1).join(' ') || nombre;
 
+    // Encode order data to pass through Tilopay redirect
+    const orderData = {
+      orderId,
+      nombre,
+      telefono,
+      email,
+      provincia,
+      canton,
+      distrito,
+      direccion,
+      cantidad: quantity,
+      total,
+      comentarios
+    };
+    const encodedOrderData = Buffer.from(JSON.stringify(orderData)).toString('base64');
+
     const paymentPayload = {
       key: apiKey,
       amount: Math.round(total),
       currency: 'CRC',
-      redirect: `${appUrl}/success.html?orderId=${orderId}`,
+      redirect: `${appUrl}/success.html`,
       billToFirstName: firstName,
       billToLastName: lastName,
       billToAddress: direccion,
@@ -148,7 +164,8 @@ export default async function handler(req, res) {
       orderNumber: orderId,
       capture: '1',
       subscription: '0',
-      platform: 'DeepSleep'
+      platform: 'DeepSleep',
+      returnData: encodedOrderData
     };
 
     console.log('📤 [Tilopay] Sending payment request to:', `${baseUrl}/processPayment`);
