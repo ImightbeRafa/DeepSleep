@@ -122,8 +122,8 @@ async function handleSinpePayment(data) {
         
         showLoading(false);
         
-        // Show success modal with SINPE instructions
-        showSinpeModal(result.orderId);
+        // Show success message
+        showMessage(`¡Pedido recibido! Número de orden: ${result.orderId}. Revise su correo para las instrucciones de pago SINPE.`, 'success');
         
         // Reset form
         orderForm.reset();
@@ -165,36 +165,6 @@ async function handleTilopayPayment(data) {
     }
 }
 
-// Show SINPE modal with instructions
-function showSinpeModal(orderId) {
-    const modal = document.getElementById('payment-modal');
-    const modalBody = document.getElementById('modal-body');
-    
-    modalBody.innerHTML = `
-        <h2>📱 Instrucciones de Pago SINPE</h2>
-        <div class="modal-order-info">
-            <p><strong>Número de Orden:</strong></p>
-            <p class="order-id-display">${orderId}</p>
-        </div>
-        <div class="sinpe-instructions">
-            <h3>Siga estos pasos:</h3>
-            <ol>
-                <li>Abra la aplicación SINPE Móvil de su banco</li>
-                <li>Realice una transferencia por <strong>₡${(basePrice * parseInt(document.getElementById('cantidad').value)).toLocaleString('es-CR')}</strong></li>
-                <li><strong>Importante:</strong> En el concepto o descripción, escriba: <code>${orderId}</code></li>
-                <li>Complete la transferencia</li>
-            </ol>
-            <div class="warning-box">
-                <p>⚠️ <strong>Recuerde usar el número de orden (${orderId}) en el concepto del SINPE para que podamos verificar su pago.</strong></p>
-            </div>
-            <p>Recibirá un correo electrónico con esta información y los detalles de su pedido.</p>
-        </div>
-        <button class="btn btn-primary" onclick="window.location.href='/'">Entendido</button>
-    `;
-    
-    modal.style.display = 'flex';
-}
-
 // Show message function
 function showMessage(text, type = 'success') {
     // Remove existing messages
@@ -227,23 +197,6 @@ function showLoading(show) {
         overlay.style.display = show ? 'flex' : 'none';
     }
 }
-
-// Modal close handler
-const modal = document.getElementById('payment-modal');
-const closeBtn = document.querySelector('.modal-close');
-
-if (closeBtn) {
-    closeBtn.addEventListener('click', function() {
-        modal.style.display = 'none';
-    });
-}
-
-// Close modal when clicking outside
-window.addEventListener('click', function(e) {
-    if (e.target === modal) {
-        modal.style.display = 'none';
-    }
-});
 
 // Initialize total on page load
 document.addEventListener('DOMContentLoaded', function() {

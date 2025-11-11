@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     } = req.body;
 
     // Validation
-    if (!nombre || !telefono || !provincia || !canton || !distrito || !direccion || !cantidad) {
+    if (!nombre || !telefono || !email || !provincia || !canton || !distrito || !direccion || !cantidad) {
       return res.status(400).json({
         error: 'Missing required fields'
       });

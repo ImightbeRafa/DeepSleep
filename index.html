@@ -327,8 +327,8 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="email">Email (opcional)</label>
-                        <input type="email" id="email" name="email">
+                        <label for="email">Email *</label>
+                        <input type="email" id="email" name="email" required>
                     </div>
                     
                     <div class="form-group">
@@ -366,7 +366,7 @@
                     
                     <button type="submit" class="btn btn-primary btn-submit">Enviar Pedido</button>
                     
-                    <p class="form-note">* Te contactaremos pronto con los datos para el pago y confirmaremos tu pedido.</p>
+                    <p class="form-note">* Recibirá un correo con las instrucciones de pago y la confirmación de su pedido.</p>
                 </form>
             </div>
         </div>
@@ -399,14 +399,6 @@
             </p>
         </div>
     </footer>
-
-    <!-- Payment Instructions Modal -->
-    <div id="payment-modal" class="modal">
-        <div class="modal-content">
-            <span class="modal-close">&times;</span>
-            <div id="modal-body"></div>
-        </div>
-    </div>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay" style="display: none;">
