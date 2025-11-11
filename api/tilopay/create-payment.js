@@ -120,51 +120,74 @@ export default async function handler(req, res) {
     const accessToken = await authenticateTilopay();
     console.log('✅ [Tilopay] Authentication successful');
 
-    // Create payment link using /captures endpoint
+    // Create payment link using /processPayment endpoint
     const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
     const apiKey = process.env.TILOPAY_API_KEY;
     const appUrl = process.env.APP_URL || 'https://serverservidorescerbero.com';
 
-    const capturePayload = {
+    // Split name into first and last name
+    const nameParts = nombre.split(' ');
+    const firstName = nameParts[0] || nombre;
+    const lastName = nameParts.slice(1).join(' ') || nombre;
+
+    const paymentPayload = {
       key: apiKey,
       amount: Math.round(total),
       currency: 'CRC',
-      description: `Orden ${orderId}: DeepSleep Bucal Anti-Ronquidos (x${quantity})`,
-      order_id: orderId,
-      redirect_success: `${appUrl}/success.html?orderId=${orderId}`,
-      redirect_error: `${appUrl}/error.html?orderId=${orderId}`,
-      notification_url: `${appUrl}/api/tilopay/webhook`,
-      email: email || '',
-      platform: '5'
+      redirect: `${appUrl}/success.html?orderId=${orderId}`,
+      billToFirstName: firstName,
+      billToLastName: lastName,
+      billToAddress: direccion,
+      billToAddress2: `${distrito}, ${canton}`,
+      billToCity: canton,
+      billToState: 'CR-' + (provincia === 'San José' ? 'SJ' : 'OT'),
+      billToZipPostCode: '10101',
+      billToCountry: 'CR',
+      billToTelephone: telefono,
+      billToEmail: email,
+      orderNumber: orderId,
+      capture: '1',
+      subscription: '0',
+      platform: 'DeepSleep'
     };
 
-    const captureResponse = await fetch(`${baseUrl}/captures`, {
+    console.log('📤 [Tilopay] Sending payment request to:', `${baseUrl}/processPayment`);
+    console.log('📦 [Tilopay] Payload:', JSON.stringify(paymentPayload, null, 2));
+
+    const captureResponse = await fetch(`${baseUrl}/processPayment`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${accessToken}`
       },
-      body: JSON.stringify(capturePayload)
+      body: JSON.stringify(paymentPayload)
     });
+
+    console.log('📥 [Tilopay] Response status:', captureResponse.status);
 
     if (!captureResponse.ok) {
       const errorText = await captureResponse.text();
-      console.error('Tilopay capture error:', errorText);
-      throw new Error('Failed to create payment link');
+      console.error('❌ [Tilopay] Payment error:', errorText);
+      throw new Error(`Failed to create payment link: ${captureResponse.status} - ${errorText}`);
     }
 
-    const captureData = await captureResponse.json();
+    const paymentData = await captureResponse.json();
 
-    console.log('✅ Payment link created:', {
-      orderId,
-      paymentUrl: captureData.payment_url || captureData.url
-    });
+    console.log('✅ Payment link created:', paymentData);
+
+    // Extract payment URL from response
+    const paymentUrl = paymentData.urlPaymentForm || paymentData.url || paymentData.payment_url;
+
+    if (!paymentUrl) {
+      console.error('❌ [Tilopay] No payment URL in response:', paymentData);
+      throw new Error('No payment URL received from Tilopay');
+    }
 
     return res.json({
       success: true,
       orderId,
-      paymentUrl: captureData.payment_url || captureData.url,
-      transactionId: captureData.transaction_id || captureData.id
+      paymentUrl: paymentUrl,
+      transactionId: paymentData.id || paymentData.transaction_id
     });
 
   } catch (error) {
