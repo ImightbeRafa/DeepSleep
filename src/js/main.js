@@ -2,8 +2,16 @@
 import '../styles/main.css';
 
 // Constants
-const basePrice = 9900;
 const API_BASE_URL = '/api'; // Vercel serverless functions
+
+// Pricing structure
+const pricing = {
+    1: 9900,   // 1 unit: ₡9.900
+    2: 16900,  // 2 units: ₡16.900 (₡8.450 each)
+    3: 23900,  // 3 units: ₡23.900 (₡7.967 each)
+    4: 30900,  // 4 units: ₡30.900 (₡7.725 each)
+    5: 37900   // 5 units: ₡37.900 (₡7.580 each)
+};
 
 // Smooth scrolling for navigation links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -22,12 +30,19 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 // Update total price based on quantity
 const quantitySelect = document.getElementById('cantidad');
 const totalElement = document.querySelector('.summary-total span:last-child');
+const summaryItemElement = document.querySelector('.summary-item span:last-child');
 
 function updateTotal() {
     if (!quantitySelect || !totalElement) return;
     
     const quantity = parseInt(quantitySelect.value) || 1;
-    const total = basePrice * quantity;
+    const total = pricing[quantity] || pricing[1];
+    
+    // Update price per unit display
+    const pricePerUnit = Math.round(total / quantity);
+    if (summaryItemElement) {
+        summaryItemElement.textContent = `₡${pricePerUnit.toLocaleString('es-CR')} c/u`;
+    }
     
     // Format number with Costa Rican colones format
     totalElement.textContent = `₡${total.toLocaleString('es-CR')}`;
@@ -35,6 +50,8 @@ function updateTotal() {
 
 if (quantitySelect) {
     quantitySelect.addEventListener('change', updateTotal);
+    // Initialize pricing on page load
+    updateTotal();
 }
 
 // Payment method change handler

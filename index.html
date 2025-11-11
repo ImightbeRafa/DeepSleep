@@ -22,6 +22,7 @@
                 <a href="#como-funciona" class="nav-link">Cómo Funciona</a>
                 <a href="#cuidados" class="nav-link">Cuidados</a>
                 <a href="#pedido" class="nav-link">Ordena aca</a>
+                <a href="#contacto" class="nav-link">Contacto</a>
             </nav>
         </div>
     </header>
@@ -274,10 +275,13 @@
             
             <div class="order-container">
                 <div class="order-summary">
+                    <div class="product-image-container">
+                        <img src="/images/product.png" alt="DeepSleep Bucal Anti-Ronquidos" class="summary-product-image">
+                    </div>
                     <h3>Resumen del Pedido</h3>
                     <div class="summary-item">
                         <span>Bucal Anti-Ronquidos DeepSleep</span>
-                        <span>₡9.900</span>
+                        <span>₡9.900 c/u</span>
                     </div>
                     <div class="summary-item">
                         <span>Envío</span>
@@ -292,33 +296,42 @@
                 <form id="order-form" class="order-form">
                     <h3>Información de Envío</h3>
                     
-                    <div class="form-group">
-                        <label for="nombre">Nombre Completo *</label>
-                        <input type="text" id="nombre" name="nombre" required>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nombre">Nombre Completo *</label>
+                            <input type="text" id="nombre" name="nombre" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="telefono">Teléfono *</label>
+                            <input type="tel" id="telefono" name="telefono" required>
+                        </div>
                     </div>
                     
                     <div class="form-group">
-                        <label for="telefono">Teléfono *</label>
-                        <input type="tel" id="telefono" name="telefono" required>
+                        <label for="email">Email *</label>
+                        <input type="email" id="email" name="email" required>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="provincia">Provincia *</label>
-                        <select id="provincia" name="provincia" required>
-                            <option value="">Selecciona una provincia</option>
-                            <option value="San José">San José</option>
-                            <option value="Alajuela">Alajuela</option>
-                            <option value="Cartago">Cartago</option>
-                            <option value="Heredia">Heredia</option>
-                            <option value="Guanacaste">Guanacaste</option>
-                            <option value="Puntarenas">Puntarenas</option>
-                            <option value="Limón">Limón</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="canton">Cantón *</label>
-                        <input type="text" id="canton" name="canton" required>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="provincia">Provincia *</label>
+                            <select id="provincia" name="provincia" required>
+                                <option value="">Selecciona</option>
+                                <option value="San José">San José</option>
+                                <option value="Alajuela">Alajuela</option>
+                                <option value="Cartago">Cartago</option>
+                                <option value="Heredia">Heredia</option>
+                                <option value="Guanacaste">Guanacaste</option>
+                                <option value="Puntarenas">Puntarenas</option>
+                                <option value="Limón">Limón</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="canton">Cantón *</label>
+                            <input type="text" id="canton" name="canton" required>
+                        </div>
                     </div>
                     
                     <div class="form-group">
@@ -327,41 +340,38 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="email">Email *</label>
-                        <input type="email" id="email" name="email" required>
+                        <label for="direccion">Dirección *</label>
+                        <textarea id="direccion" name="direccion" rows="2" placeholder="Dirección exacta con señas" required></textarea>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="direccion">Dirección donde desea recibir el pedido *</label>
-                        <textarea id="direccion" name="direccion" rows="3" placeholder="Dirección exacta con señas" required></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cantidad">Cantidad *</label>
-                        <select id="cantidad" name="cantidad" required>
-                            <option value="1">1 unidad</option>
-                            <option value="2">2 unidades</option>
-                            <option value="3">3 unidades</option>
-                            <option value="4">4 unidades</option>
-                            <option value="5">5 unidades</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="metodo-pago">Método de Pago *</label>
-                        <select id="metodo-pago" name="metodo-pago" required>
-                            <option value="">Selecciona un método</option>
-                            <option value="SINPE">SINPE Móvil</option>
-                            <option value="Tarjeta">Tarjeta (Tilopay)</option>
-                        </select>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cantidad">Cantidad *</label>
+                            <select id="cantidad" name="cantidad" required>
+                                <option value="1">1 unidad</option>
+                                <option value="2">2 unidades</option>
+                                <option value="3">3 unidades</option>
+                                <option value="4">4 unidades</option>
+                                <option value="5">5 unidades</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="metodo-pago">Método de Pago *</label>
+                            <select id="metodo-pago" name="metodo-pago" required>
+                                <option value="">Selecciona</option>
+                                <option value="SINPE">SINPE Móvil</option>
+                                <option value="Tarjeta">Tarjeta (Tilopay)</option>
+                            </select>
+                        </div>
                     </div>
                     
                     <!-- Payment Info Box -->
                     <div id="payment-info" class="payment-info-box" style="display: none;"></div>
                     
                     <div class="form-group">
-                        <label for="comentarios">Comentarios Adicionales (opcional)</label>
-                        <textarea id="comentarios" name="comentarios" rows="3"></textarea>
+                        <label for="comentarios">Comentarios (opcional)</label>
+                        <textarea id="comentarios" name="comentarios" rows="2"></textarea>
                     </div>
                     
                     <button type="submit" class="btn btn-primary btn-submit">Enviar Pedido</button>
@@ -373,7 +383,7 @@
     </section>
 
     <!-- Contact Section -->
-    <section class="contact-section">
+    <section id="contacto" class="contact-section">
         <div class="container">
             <h2>Contáctanos</h2>
             <p>¿Tienes preguntas? Estamos aquí para ayudarte</p>

@@ -39,13 +39,20 @@ export default async function handler(req, res) {
       });
     }
 
-    // Calculate total
-    const basePrice = 9900;
+    // Calculate total with tiered pricing
+    const pricing = {
+      1: 9900,   // 1 unit: ₡9.900
+      2: 16900,  // 2 units: ₡16.900
+      3: 23900,  // 3 units: ₡23.900
+      4: 30900,  // 4 units: ₡30.900
+      5: 37900   // 5 units: ₡37.900
+    };
+    
     const quantity = parseInt(cantidad) || 1;
-    const total = basePrice * quantity;
+    const total = pricing[quantity] || pricing[1];
 
-    // Generate unique order ID
-    const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    // Generate simple order ID (6-digit number)
+    const orderId = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Prepare order data
     const order = {
