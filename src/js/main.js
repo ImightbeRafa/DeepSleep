@@ -122,6 +122,12 @@ async function handleSinpePayment(data) {
         
         showLoading(false);
         
+        // Hide payment info box
+        const paymentInfoBox = document.getElementById('payment-info');
+        if (paymentInfoBox) {
+            paymentInfoBox.style.display = 'none';
+        }
+        
         // Show success message
         showMessage(`¡Pedido recibido! Número de orden: ${result.orderId}. Revise su correo para las instrucciones de pago SINPE.`, 'success');
         
@@ -147,13 +153,17 @@ async function handleTilopayPayment(data) {
         });
         
         if (!response.ok) {
-            throw new Error('Failed to create payment link');
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            console.error('Tilopay API error:', errorData);
+            throw new Error(errorData.message || 'Failed to create payment link');
         }
         
         const result = await response.json();
         
+        showLoading(false);
+        
+        // Redirect to Tilopay payment page
         if (result.paymentUrl) {
-            // Redirect to Tilopay payment page
             window.location.href = result.paymentUrl;
         } else {
             throw new Error('No payment URL received');
@@ -177,16 +187,21 @@ function showMessage(text, type = 'success') {
     const message = document.createElement('div');
     message.className = `message ${type}`;
     message.textContent = text;
+    message.style.maxWidth = '100%';
+    message.style.width = '100%';
     
     // Insert before form
     const orderForm = document.getElementById('order-form');
     if (orderForm) {
         orderForm.parentNode.insertBefore(message, orderForm);
         
-        // Auto remove after 5 seconds
+        // Scroll to message
+        message.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        
+        // Auto remove after 8 seconds
         setTimeout(() => {
             message.remove();
-        }, 5000);
+        }, 8000);
     }
 }
 

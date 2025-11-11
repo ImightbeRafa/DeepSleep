@@ -8,9 +8,17 @@ async function authenticateTilopay() {
   const apiUser = process.env.TILOPAY_USER;
   const apiPassword = process.env.TILOPAY_PASSWORD;
 
+  console.log('🔍 [Tilopay Auth] Checking credentials...', {
+    hasUser: !!apiUser,
+    hasPassword: !!apiPassword,
+    baseUrl
+  });
+
   if (!apiUser || !apiPassword) {
-    throw new Error('Tilopay credentials not configured');
+    throw new Error('Tilopay credentials not configured in environment variables');
   }
+
+  console.log('🔍 [Tilopay Auth] Sending login request...');
 
   const loginResponse = await fetch(`${baseUrl}/login`, {
     method: 'POST',
@@ -23,11 +31,17 @@ async function authenticateTilopay() {
 
   if (!loginResponse.ok) {
     const errorText = await loginResponse.text();
-    console.error('Tilopay login error:', errorText);
-    throw new Error('Failed to authenticate with Tilopay');
+    console.error('❌ [Tilopay Auth] Login failed:', errorText);
+    throw new Error(`Failed to authenticate with Tilopay: ${loginResponse.status} ${errorText}`);
   }
 
   const loginData = await loginResponse.json();
+  console.log('✅ [Tilopay Auth] Token received');
+  
+  if (!loginData.access_token) {
+    throw new Error('No access token in Tilopay response');
+  }
+  
   return loginData.access_token;
 }
 
@@ -49,6 +63,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  console.log('🔵 [Tilopay] Creating payment link...');
 
   try {
     const {
@@ -100,7 +116,9 @@ export default async function handler(req, res) {
     };
 
     // Authenticate with Tilopay
+    console.log('🔑 [Tilopay] Authenticating...');
     const accessToken = await authenticateTilopay();
+    console.log('✅ [Tilopay] Authentication successful');
 
     // Create payment link using /captures endpoint
     const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
@@ -150,10 +168,12 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('❌ Create payment error:', error);
+    console.error('❌ [Tilopay] Create payment error:', error);
+    console.error('❌ [Tilopay] Error stack:', error.stack);
     return res.status(500).json({
       error: 'Failed to create payment',
-      message: error.message
+      message: error.message,
+      details: error.toString()
     });
   }
 }

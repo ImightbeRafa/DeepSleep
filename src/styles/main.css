@@ -726,6 +726,9 @@ section {
     grid-template-columns: 1fr 1.5fr;
     gap: var(--spacing-lg);
     margin-top: var(--spacing-lg);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .order-summary {
@@ -1020,6 +1023,9 @@ section {
     margin-bottom: var(--spacing-md);
     text-align: center;
     font-weight: 500;
+    box-sizing: border-box;
+    max-width: 100%;
+    word-wrap: break-word;
 }
 
 .message.success {
