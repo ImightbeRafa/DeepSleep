@@ -348,14 +348,16 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="metodo-pago">Método de Pago Preferido *</label>
+                        <label for="metodo-pago">Método de Pago *</label>
                         <select id="metodo-pago" name="metodo-pago" required>
                             <option value="">Selecciona un método</option>
-                            <option value="SINPE">SINPE</option>
-                            <option value="Transferencia">Transferencia Bancaria</option>
-                            <option value="Tilopay">Tilopay</option>
+                            <option value="SINPE">SINPE Móvil</option>
+                            <option value="Tarjeta">Tarjeta (Tilopay)</option>
                         </select>
                     </div>
+                    
+                    <!-- Payment Info Box -->
+                    <div id="payment-info" class="payment-info-box" style="display: none;"></div>
                     
                     <div class="form-group">
                         <label for="comentarios">Comentarios Adicionales (opcional)</label>
@@ -397,6 +399,22 @@
             </p>
         </div>
     </footer>
+
+    <!-- Payment Instructions Modal -->
+    <div id="payment-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Procesando su pedido...</p>
+        </div>
+    </div>
 
     <script type="module" src="/src/js/main.js"></script>
 </body>

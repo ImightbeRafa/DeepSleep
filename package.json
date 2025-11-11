@@ -15,6 +15,7 @@
   ],
   "author": "DeepSleep",
   "license": "MIT",
+  "dependencies": {},
   "devDependencies": {
     "terser": "^5.44.1",
     "vite": "^5.0.0"

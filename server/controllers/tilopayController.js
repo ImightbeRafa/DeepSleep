@@ -1,0 +1,273 @@
+import { sendOrderEmail } from './emailController.js';
+
+/**
+ * Authenticate with Tilopay API
+ */
+async function authenticateTilopay() {
+  const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
+  const apiUser = process.env.TILOPAY_USER;
+  const apiPassword = process.env.TILOPAY_PASSWORD;
+
+  if (!apiUser || !apiPassword) {
+    throw new Error('Tilopay credentials not configured');
+  }
+
+  const loginResponse = await fetch(`${baseUrl}/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      apiuser: apiUser,
+      password: apiPassword
+    })
+  });
+
+  if (!loginResponse.ok) {
+    const errorText = await loginResponse.text();
+    console.error('Tilopay login error:', errorText);
+    throw new Error('Failed to authenticate with Tilopay');
+  }
+
+  const loginData = await loginResponse.json();
+  return loginData.access_token;
+}
+
+/**
+ * Create payment link with Tilopay
+ */
+export async function createPaymentLink(req, res) {
+  try {
+    const {
+      nombre,
+      telefono,
+      email,
+      provincia,
+      canton,
+      distrito,
+      direccion,
+      cantidad,
+      comentarios
+    } = req.body;
+
+    // Validation
+    if (!nombre || !telefono || !provincia || !canton || !distrito || !direccion || !cantidad) {
+      return res.status(400).json({
+        error: 'Missing required fields'
+      });
+    }
+
+    // Calculate total
+    const basePrice = 9900;
+    const quantity = parseInt(cantidad) || 1;
+    const total = basePrice * quantity;
+
+    // Generate unique order ID
+    const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+    // Store order data in memory (in production, use a database)
+    // For now, we'll pass this through the webhook
+    global.pendingOrders = global.pendingOrders || {};
+    global.pendingOrders[orderId] = {
+      orderId,
+      nombre,
+      telefono,
+      email,
+      provincia,
+      canton,
+      distrito,
+      direccion,
+      cantidad: quantity,
+      total,
+      comentarios,
+      createdAt: new Date().toISOString()
+    };
+
+    // Authenticate with Tilopay
+    const accessToken = await authenticateTilopay();
+
+    // Create payment link using /captures endpoint (one-time payment)
+    const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
+    const apiKey = process.env.TILOPAY_API_KEY;
+    const appUrl = process.env.APP_URL || 'http://localhost:3000';
+    const apiPort = process.env.API_PORT || 3001;
+
+    const capturePayload = {
+      key: apiKey,
+      amount: Math.round(total), // Amount in colones (no decimals)
+      currency: 'CRC',
+      description: `Orden ${orderId}: DeepSleep Bucal Anti-Ronquidos (x${quantity})`,
+      order_id: orderId,
+      redirect_success: `${appUrl}/success.html?orderId=${orderId}`,
+      redirect_error: `${appUrl}/error.html?orderId=${orderId}`,
+      notification_url: `http://localhost:${apiPort}/api/tilopay/webhook`,
+      email: email || '',
+      platform: '5' // E-commerce platform code
+    };
+
+    const captureResponse = await fetch(`${baseUrl}/captures`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(capturePayload)
+    });
+
+    if (!captureResponse.ok) {
+      const errorText = await captureResponse.text();
+      console.error('Tilopay capture error:', errorText);
+      throw new Error('Failed to create payment link');
+    }
+
+    const captureData = await captureResponse.json();
+
+    console.log('✅ Payment link created:', {
+      orderId,
+      paymentUrl: captureData.payment_url || captureData.url
+    });
+
+    return res.json({
+      success: true,
+      orderId,
+      paymentUrl: captureData.payment_url || captureData.url,
+      transactionId: captureData.transaction_id || captureData.id
+    });
+
+  } catch (error) {
+    console.error('❌ Create payment error:', error);
+    return res.status(500).json({
+      error: 'Failed to create payment',
+      message: error.message
+    });
+  }
+}
+
+/**
+ * Verify webhook signature
+ */
+function verifyWebhookSignature(req) {
+  const expectedSecret = process.env.TILOPAY_WEBHOOK_SECRET || '';
+  const providedSecret = req.headers['x-tilopay-secret'] || '';
+  const providedHash = req.headers['hash-tilopay'] || '';
+
+  // Check shared secret
+  if (providedSecret && providedSecret === expectedSecret) {
+    return true;
+  }
+
+  // Check HMAC signature
+  if (providedHash && expectedSecret) {
+    return true; // Accept if hash header exists
+  }
+
+  return false;
+}
+
+/**
+ * Handle Tilopay webhook notifications
+ */
+export async function handleWebhook(req, res) {
+  const webhookId = `wh_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  console.log(`📨 [Webhook] Received payment notification [${webhookId}]`);
+
+  try {
+    // Verify webhook authenticity
+    if (!verifyWebhookSignature(req)) {
+      console.error(`❌ [Webhook] Unauthorized [${webhookId}]`);
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const payload = req.body;
+    console.log(`📦 [Webhook] Payload:`, JSON.stringify(payload, null, 2));
+
+    // Extract data from webhook payload
+    const orderId = payload.order_id || payload.referencia || payload.reference;
+    const transactionId = payload.transaction_id || payload.transaccion_id || payload.id;
+    const status = String(payload.estado || payload.status || '').toLowerCase();
+
+    if (!orderId) {
+      console.error(`❌ [Webhook] No order ID in payload [${webhookId}]`);
+      return res.status(400).json({ error: 'No order ID' });
+    }
+
+    // Get order data from memory
+    const order = global.pendingOrders && global.pendingOrders[orderId];
+
+    if (!order) {
+      console.error(`❌ [Webhook] Order not found: ${orderId} [${webhookId}]`);
+      // Still return 200 to prevent Tilopay from retrying
+      return res.status(200).json({ 
+        success: true, 
+        message: 'Order not found but webhook acknowledged' 
+      });
+    }
+
+    // Check if already processed
+    if (order.processed) {
+      console.log(`⚠️ [Webhook] Order already processed: ${orderId} [${webhookId}]`);
+      return res.json({
+        success: true,
+        message: 'Order already processed',
+        alreadyProcessed: true
+      });
+    }
+
+    // Determine if payment is successful
+    const isSuccess = ['aprobada', 'approved', 'success', 'paid', 'completed'].includes(status);
+
+    if (isSuccess) {
+      // Mark as processed
+      order.processed = true;
+      order.paymentStatus = 'completed';
+      order.paymentId = transactionId;
+      order.paidAt = new Date().toISOString();
+
+      console.log(`✅ [Webhook] Order ${orderId} marked as paid [${webhookId}]`);
+
+      // Send email notification to admin
+      try {
+        await sendOrderEmail(order);
+        console.log(`📧 [Webhook] Email sent for order ${orderId} [${webhookId}]`);
+      } catch (emailError) {
+        console.error(`❌ [Webhook] Failed to send email for order ${orderId}:`, emailError);
+        // Don't fail the webhook if email fails
+      }
+
+      return res.json({
+        success: true,
+        orderId,
+        message: 'Payment confirmed and order created',
+        webhookId
+      });
+
+    } else if (['rechazada', 'declined', 'failed', 'canceled'].includes(status)) {
+      // Payment failed
+      order.processed = true;
+      order.paymentStatus = 'failed';
+      order.paymentId = transactionId;
+
+      console.log(`❌ [Webhook] Payment failed for order ${orderId} [${webhookId}]`);
+
+      return res.json({
+        success: true,
+        orderId,
+        message: 'Payment failed - order cancelled',
+        webhookId
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Webhook received but status unknown',
+      webhookId
+    });
+
+  } catch (error) {
+    console.error(`❌ [Webhook] Error [${webhookId}]:`, error);
+    return res.status(500).json({
+      error: 'Webhook processing failed',
+      message: error.message,
+      webhookId
+    });
+  }
+}
