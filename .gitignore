@@ -8,7 +8,8 @@ pnpm-lock.yaml
 dist/
 dist-ssr/
 *.local
-
+test-betsy-endpoint.js
+validate-payload-structure.js
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
