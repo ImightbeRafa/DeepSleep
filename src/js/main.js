@@ -4,13 +4,13 @@ import '../styles/main.css';
 // Constants
 const API_BASE_URL = '/api'; // Vercel serverless functions
 
-// Pricing structure
+// Pricing structure - MUST match backend pricing
 const pricing = {
     1: 9900,   // 1 unit: ₡9,900
     2: 16900,  // 2 units: ₡16,900 (₡8,450 each)
-    3: 25900,  // 3 units: ₡25,900 (₡8,633 each)
-    4: 33900,  // 4 units: ₡33,900 (₡8,475 each)
-    5: 42900   // 5 units: ₡42,900 (₡8,580 each)
+    3: 23900,  // 3 units: ₡23,900 (₡7,967 each)
+    4: 30900,  // 4 units: ₡30,900 (₡7,725 each)
+    5: 37900   // 5 units: ₡37,900 (₡7,580 each)
 };
 
 // Smooth scrolling for navigation links

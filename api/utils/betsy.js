@@ -93,6 +93,10 @@ export async function sendOrderToBetsy(orderData) {
 
     console.log('📦 [Betsy] Order payload:', JSON.stringify(betsyOrder, null, 2));
 
+    // Create timeout controller for compatibility
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -100,9 +104,10 @@ export async function sendOrderToBetsy(orderData) {
         'x-api-key': apiKey,
       },
       body: JSON.stringify(betsyOrder),
-      // Add timeout
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
