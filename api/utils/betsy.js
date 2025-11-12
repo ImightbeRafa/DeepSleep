@@ -92,6 +92,8 @@ export async function sendOrderToBetsy(orderData) {
     };
 
     console.log('📦 [Betsy] Order payload:', JSON.stringify(betsyOrder, null, 2));
+    console.log('🌐 [Betsy] Sending to URL:', apiUrl);
+    console.log('🔑 [Betsy] Using API key:', apiKey.substring(0, 20) + '...');
 
     // Create timeout controller for compatibility
     const controller = new AbortController();
@@ -108,10 +110,15 @@ export async function sendOrderToBetsy(orderData) {
     });
     
     clearTimeout(timeoutId);
+    
+    console.log('📥 [Betsy] Response status:', response.status, response.statusText);
+    console.log('📥 [Betsy] Response content-type:', response.headers.get('content-type'));
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ [Betsy] CRM sync failed:', response.status, errorText);
+      console.error('❌ [Betsy] Failed order ID:', orderData.orderId);
+      console.error('❌ [Betsy] Response headers:', JSON.stringify([...response.headers.entries()]));
       
       // Return error but don't throw - we don't want to fail the order
       return {
@@ -123,6 +130,7 @@ export async function sendOrderToBetsy(orderData) {
 
     const result = await response.json();
     console.log('✅ [Betsy] Order synced to CRM:', result.crmOrderId || result.id);
+    console.log('✅ [Betsy] Full response:', JSON.stringify(result));
 
     return {
       success: true,
