@@ -78,11 +78,14 @@ export default async function handler(req, res) {
 
     console.log('✅ SINPE order email sent:', orderId);
 
-    // Send order to Betsy CRM (async, don't wait for response)
-    sendOrderToBetsyWithRetry(order).catch(error => {
+    // Send order to Betsy CRM (wait for it to complete)
+    try {
+      await sendOrderToBetsyWithRetry(order);
+      console.log('✅ SINPE order synced to Betsy CRM');
+    } catch (error) {
       console.error('❌ Failed to sync SINPE order to Betsy CRM:', error);
-      // Don't fail the order if Betsy sync fails
-    });
+      // Don't fail the order if Betsy sync fails - just log it
+    }
 
     return res.json({
       success: true,

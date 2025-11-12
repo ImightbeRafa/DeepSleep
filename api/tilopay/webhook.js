@@ -119,15 +119,18 @@ export default async function handler(req, res) {
         console.error(`❌ [Webhook] Failed to send email for order ${orderId}:`, emailError);
       }
 
-      // Send order to Betsy CRM (async, don't wait for response)
-      sendOrderToBetsyWithRetry({
-        ...order,
-        paymentMethod: 'Tilopay',
-        transactionId: transactionId
-      }).catch(error => {
+      // Send order to Betsy CRM (wait for it to complete)
+      try {
+        await sendOrderToBetsyWithRetry({
+          ...order,
+          paymentMethod: 'Tilopay',
+          transactionId: transactionId
+        });
+        console.log(`✅ [Webhook] Order synced to Betsy CRM: ${orderId}`);
+      } catch (error) {
         console.error(`❌ [Webhook] Failed to sync order to Betsy CRM:`, error);
-        // Don't fail the webhook if Betsy sync fails
-      });
+        // Don't fail the webhook if Betsy sync fails - just log it
+      }
 
       return res.json({
         success: true,
