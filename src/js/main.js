@@ -6,11 +6,11 @@ const API_BASE_URL = '/api'; // Vercel serverless functions
 
 // Pricing structure
 const pricing = {
-    1: 9900,   // 1 unit: ₡9.900
-    2: 16900,  // 2 units: ₡16.900 (₡8.450 each)
-    3: 23900,  // 3 units: ₡23.900 (₡7.967 each)
-    4: 30900,  // 4 units: ₡30.900 (₡7.725 each)
-    5: 37900   // 5 units: ₡37.900 (₡7.580 each)
+    1: 9900,   // 1 unit: ₡9,900
+    2: 16900,  // 2 units: ₡16,900 (₡8,450 each)
+    3: 25900,  // 3 units: ₡25,900 (₡8,633 each)
+    4: 33900,  // 4 units: ₡33,900 (₡8,475 each)
+    5: 42900   // 5 units: ₡42,900 (₡8,580 each)
 };
 
 // Smooth scrolling for navigation links
@@ -31,17 +31,34 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 const quantitySelect = document.getElementById('cantidad');
 const totalElement = document.querySelector('.summary-total span:last-child');
 const summaryItemElement = document.querySelector('.summary-item span:last-child');
+const savingsElement = document.querySelector('.summary-savings');
 
 function updateTotal() {
     if (!quantitySelect || !totalElement) return;
     
     const quantity = parseInt(quantitySelect.value) || 1;
     const total = pricing[quantity] || pricing[1];
+    const unitPrice = pricing[1];
     
-    // Update price per unit display
-    const pricePerUnit = Math.round(total / quantity);
+    // Update quantity and total display
     if (summaryItemElement) {
-        summaryItemElement.textContent = `₡${pricePerUnit.toLocaleString('es-CR')} c/u`;
+        if (quantity === 1) {
+            summaryItemElement.textContent = `₡${total.toLocaleString('es-CR')}`;
+        } else {
+            summaryItemElement.textContent = `${quantity} x ₡${total.toLocaleString('es-CR')}`;
+        }
+    }
+    
+    // Calculate and show savings for multiple units
+    if (savingsElement) {
+        if (quantity > 1) {
+            const regularPrice = unitPrice * quantity;
+            const savings = regularPrice - total;
+            savingsElement.style.display = 'flex';
+            savingsElement.querySelector('span:last-child').textContent = `-₡${savings.toLocaleString('es-CR')}`;
+        } else {
+            savingsElement.style.display = 'none';
+        }
     }
     
     // Format number with Costa Rican colones format

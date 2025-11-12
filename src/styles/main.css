@@ -773,6 +773,16 @@ section {
     font-weight: 600;
 }
 
+.summary-savings {
+    color: #059669;
+    font-weight: 600;
+}
+
+.summary-savings .savings-amount {
+    color: #059669;
+    font-weight: 700;
+}
+
 .summary-total {
     display: flex;
     justify-content: space-between;
