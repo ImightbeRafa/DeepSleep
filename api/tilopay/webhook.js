@@ -1,4 +1,5 @@
 import { sendOrderEmail } from '../utils/email.js';
+import { sendOrderToBetsyWithRetry } from '../utils/betsy.js';
 
 /**
  * Verify webhook signature
@@ -117,6 +118,16 @@ export default async function handler(req, res) {
       } catch (emailError) {
         console.error(`❌ [Webhook] Failed to send email for order ${orderId}:`, emailError);
       }
+
+      // Send order to Betsy CRM (async, don't wait for response)
+      sendOrderToBetsyWithRetry({
+        ...order,
+        paymentMethod: 'Tilopay',
+        transactionId: transactionId
+      }).catch(error => {
+        console.error(`❌ [Webhook] Failed to sync order to Betsy CRM:`, error);
+        // Don't fail the webhook if Betsy sync fails
+      });
 
       return res.json({
         success: true,

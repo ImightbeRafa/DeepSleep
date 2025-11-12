@@ -1,4 +1,5 @@
 import { sendOrderEmail } from '../utils/email.js';
+import { sendOrderToBetsyWithRetry } from '../utils/betsy.js';
 
 /**
  * Vercel Serverless Function - Send SINPE Email
@@ -76,6 +77,12 @@ export default async function handler(req, res) {
     await sendOrderEmail(order);
 
     console.log('✅ SINPE order email sent:', orderId);
+
+    // Send order to Betsy CRM (async, don't wait for response)
+    sendOrderToBetsyWithRetry(order).catch(error => {
+      console.error('❌ Failed to sync SINPE order to Betsy CRM:', error);
+      // Don't fail the order if Betsy sync fails
+    });
 
     return res.json({
       success: true,
