@@ -12,8 +12,14 @@ export async function sendOrderToBetsy(orderData) {
   const apiKey = process.env.BETSY_API_KEY;
   const apiUrl = process.env.BETSY_API_URL;
 
+  console.log('🔍 [Betsy] Environment check - API Key exists:', !!apiKey);
+  console.log('🔍 [Betsy] Environment check - API URL exists:', !!apiUrl);
+  console.log('🔍 [Betsy] Environment check - API URL value:', apiUrl);
+
   if (!apiKey || !apiUrl) {
     console.warn('⚠️ [Betsy] API credentials not configured, skipping CRM sync');
+    console.warn('⚠️ [Betsy] Missing - API Key:', !apiKey);
+    console.warn('⚠️ [Betsy] Missing - API URL:', !apiUrl);
     return { success: false, error: 'Not configured' };
   }
 
@@ -99,15 +105,26 @@ export async function sendOrderToBetsy(orderData) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
     
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
-      body: JSON.stringify(betsyOrder),
-      signal: controller.signal,
-    });
+    let response;
+    try {
+      console.log('🚀 [Betsy] Making fetch request...');
+      response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify(betsyOrder),
+        signal: controller.signal,
+      });
+      console.log('✅ [Betsy] Fetch completed');
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      console.error('❌ [Betsy] Fetch failed:', fetchError.message);
+      console.error('❌ [Betsy] Fetch error name:', fetchError.name);
+      console.error('❌ [Betsy] Fetch error stack:', fetchError.stack);
+      throw fetchError; // Re-throw to be caught by outer catch
+    }
     
     clearTimeout(timeoutId);
     
@@ -140,11 +157,20 @@ export async function sendOrderToBetsy(orderData) {
 
   } catch (error) {
     console.error('❌ [Betsy] CRM sync error:', error.message);
+    console.error('❌ [Betsy] Error type:', error.name);
+    console.error('❌ [Betsy] Error details:', error);
+    console.error('❌ [Betsy] Order ID that failed:', orderData.orderId);
+    
+    // Check if it's a timeout
+    if (error.name === 'AbortError') {
+      console.error('❌ [Betsy] Request timed out after 10 seconds');
+    }
     
     // Log error but don't throw - we don't want to fail the order
     return {
       success: false,
       error: error.message,
+      errorType: error.name,
     };
   }
 }
