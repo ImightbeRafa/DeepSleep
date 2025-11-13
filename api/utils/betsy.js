@@ -66,6 +66,7 @@ export async function sendOrderToBetsy(orderData) {
       },
       shipping: {
         cost: 'GRATIS',
+        courier: 'Correos de Costa Rica', // Logistics: Always Correos de Costa Rica
         address: {
           province: orderData.provincia,
           canton: orderData.canton,
@@ -89,6 +90,8 @@ export async function sendOrderToBetsy(orderData) {
         }),
       },
       source: 'DeepSleep Website',
+      salesChannel: 'Website', // Canal de Ventas: Website
+      seller: 'Website', // Vendedor: Website
       metadata: {
         campaign: orderData.campaign || 'organic',
         referrer: orderData.referrer || 'direct',
