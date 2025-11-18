@@ -24,7 +24,7 @@ export async function sendOrderToBetsy(orderData) {
   }
 
   try {
-    console.log('📤 [Betsy] Sending order to CRM:', orderData.orderId);
+    console.log('📤 [Betsy] Sending order to CRM!:', orderData.orderId);
 
     // Determine payment status for comments
     const paymentMethod = orderData.paymentMethod || 'Tilopay';
