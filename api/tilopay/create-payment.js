@@ -96,7 +96,11 @@ export default async function handler(req, res) {
     };
     
     const quantity = parseInt(cantidad) || 1;
-    const total = pricing[quantity] || pricing[1];
+    const subtotal = pricing[quantity] || pricing[1];
+    
+    // Add shipping cost (₡2,500) only for single items
+    const shippingCost = quantity === 1 ? 2500 : 0;
+    const total = subtotal + shippingCost;
 
     // Generate simple order ID (6-digit number)
     const orderId = Math.floor(100000 + Math.random() * 900000).toString();
@@ -117,6 +121,8 @@ export default async function handler(req, res) {
       distrito,
       direccion,
       cantidad: quantity,
+      subtotal,
+      shippingCost,
       total,
       comentarios,
       createdAt: new Date().toISOString()

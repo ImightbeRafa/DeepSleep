@@ -39,8 +39,9 @@ async function sendCustomerEmail(order) {
           <p><span class="label">Número de Orden:</span> ${order.orderId}</p>
           <p><span class="label">Producto:</span> DeepSleep Bucal Anti-Ronquidos</p>
           <p><span class="label">Cantidad:</span> ${order.cantidad}</p>
+          ${order.subtotal ? `<p><span class="label">Subtotal:</span> ₡${order.subtotal.toLocaleString('es-CR')}</p>` : ''}
+          <p><span class="label">Envío:</span> ${order.shippingCost && order.shippingCost > 0 ? `₡${order.shippingCost.toLocaleString('es-CR')}` : 'GRATIS'}</p>
           <p><span class="label">Total:</span> ₡${order.total.toLocaleString('es-CR')}</p>
-          <p><span class="label">Envío:</span> GRATIS</p>
         </div>
         
         ${order.paymentMethod === 'SINPE' ? `
@@ -154,7 +155,8 @@ async function sendAdminEmail(order) {
             <div class="info-item"><span class="label">Producto:</span> DeepSleep Bucal Anti-Ronquidos</div>
             <div class="info-item"><span class="label">Cantidad:</span> ${order.cantidad}</div>
             <div class="info-item"><span class="label">Precio Unitario:</span> ₡9.900</div>
-            <div class="info-item"><span class="label">Envío:</span> GRATIS</div>
+            ${order.subtotal ? `<div class="info-item"><span class="label">Subtotal:</span> ₡${order.subtotal.toLocaleString('es-CR')}</div>` : ''}
+            <div class="info-item"><span class="label">Envío:</span> ${order.shippingCost && order.shippingCost > 0 ? `₡${order.shippingCost.toLocaleString('es-CR')}` : 'GRATIS'}</div>
             <div class="info-item total"><span class="label">Total:</span> ₡${order.total.toLocaleString('es-CR')}</div>
           </div>
 

@@ -13,6 +13,9 @@ const pricing = {
     5: 37900   // 5 units: ₡37,900 (₡7,580 each)
 };
 
+// Shipping costs
+const SHIPPING_COST = 2500; // ₡2,500 for single items only
+
 // Smooth scrolling for navigation links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
@@ -37,15 +40,44 @@ function updateTotal() {
     if (!quantitySelect || !totalElement) return;
     
     const quantity = parseInt(quantitySelect.value) || 1;
-    const total = pricing[quantity] || pricing[1];
+    const subtotal = pricing[quantity] || pricing[1];
     const unitPrice = pricing[1];
+    
+    // Add shipping cost only for single items
+    const shippingCost = quantity === 1 ? SHIPPING_COST : 0;
+    const total = subtotal + shippingCost;
     
     // Update quantity and total display
     if (summaryItemElement) {
         if (quantity === 1) {
-            summaryItemElement.textContent = `₡${total.toLocaleString('es-CR')}`;
+            summaryItemElement.textContent = `₡${subtotal.toLocaleString('es-CR')}`;
         } else {
-            summaryItemElement.textContent = `${quantity} x ₡${total.toLocaleString('es-CR')}`;
+            summaryItemElement.textContent = `${quantity} x ₡${subtotal.toLocaleString('es-CR')}`;
+        }
+    }
+    
+    // Update the existing shipping display (find by looking for span with "Envío" text)
+    const allSummaryItems = document.querySelectorAll('.summary-item');
+    let shippingElement = null;
+    allSummaryItems.forEach(item => {
+        const firstSpan = item.querySelector('span:first-child');
+        if (firstSpan && firstSpan.textContent.trim() === 'Envío') {
+            shippingElement = item;
+        }
+    });
+    
+    if (shippingElement) {
+        const shippingSpan = shippingElement.querySelector('span:last-child');
+        if (quantity === 1) {
+            shippingSpan.textContent = `₡${shippingCost.toLocaleString('es-CR')}`;
+            shippingSpan.className = ''; // Remove any 'free' class
+            shippingSpan.style.color = '';
+            shippingSpan.style.fontWeight = '';
+        } else {
+            shippingSpan.textContent = 'GRATIS';
+            shippingSpan.className = 'free';
+            shippingSpan.style.color = '#059669';
+            shippingSpan.style.fontWeight = 'bold';
         }
     }
     
@@ -53,7 +85,7 @@ function updateTotal() {
     if (savingsElement) {
         if (quantity > 1) {
             const regularPrice = unitPrice * quantity;
-            const savings = regularPrice - total;
+            const savings = regularPrice - subtotal;
             savingsElement.style.display = 'flex';
             savingsElement.querySelector('span:last-child').textContent = `-₡${savings.toLocaleString('es-CR')}`;
         } else {

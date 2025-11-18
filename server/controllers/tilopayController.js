@@ -1,4 +1,5 @@
 import { sendOrderEmail } from './emailController.js';
+import { sendOrderToBetsyWithRetry } from '../utils/betsy.js';
 
 /**
  * Authenticate with Tilopay API
@@ -55,10 +56,21 @@ export async function createPaymentLink(req, res) {
       });
     }
 
-    // Calculate total
-    const basePrice = 9900;
+    // Calculate total with tiered pricing
+    const pricing = {
+      1: 9900,   // 1 unit: ₡9.900
+      2: 16900,  // 2 units: ₡16.900
+      3: 23900,  // 3 units: ₡23.900
+      4: 30900,  // 4 units: ₡30.900
+      5: 37900   // 5 units: ₡37.900
+    };
+    
     const quantity = parseInt(cantidad) || 1;
-    const total = basePrice * quantity;
+    const subtotal = pricing[quantity] || pricing[1];
+    
+    // Add shipping cost (₡2,500) only for single items
+    const shippingCost = quantity === 1 ? 2500 : 0;
+    const total = subtotal + shippingCost;
 
     // Generate unique order ID
     const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
@@ -76,6 +88,8 @@ export async function createPaymentLink(req, res) {
       distrito,
       direccion,
       cantidad: quantity,
+      subtotal,
+      shippingCost,
       total,
       comentarios,
       createdAt: new Date().toISOString()
@@ -231,6 +245,19 @@ export async function handleWebhook(req, res) {
       } catch (emailError) {
         console.error(`❌ [Webhook] Failed to send email for order ${orderId}:`, emailError);
         // Don't fail the webhook if email fails
+      }
+
+      // Send order to Betsy CRM (wait for it to complete)
+      try {
+        await sendOrderToBetsyWithRetry({
+          ...order,
+          paymentMethod: 'Tilopay',
+          transactionId: transactionId
+        });
+        console.log(`✅ [Webhook] Order synced to Betsy CRM: ${orderId}`);
+      } catch (error) {
+        console.error(`❌ [Webhook] Failed to sync order to Betsy CRM:`, error);
+        // Don't fail the webhook if Betsy sync fails - just log it
       }
 
       return res.json({
