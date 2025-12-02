@@ -163,6 +163,18 @@
             hasReturnData: !!returnData
         });
         
+        // Check if payment was actually successful
+        // code=1 means approved, anything else means declined/failed
+        const isPaymentSuccessful = code === '1' || code === 1;
+        
+        if (!isPaymentSuccessful) {
+            // Payment was declined - redirect to error page
+            console.error('❌ Payment declined. Code:', code);
+            const errorUrl = `/error.html?orderId=${orderId || ''}&code=${code || ''}`;
+            window.location.href = errorUrl;
+            return;
+        }
+        
         // Display order ID
         if (orderId) {
             document.getElementById('order-number').textContent = orderId;
@@ -170,8 +182,8 @@
             document.getElementById('order-number').textContent = 'No disponible';
         }
         
-        // Confirm payment and send emails
-        if (code === '1' && returnData) {
+        // Confirm payment and send emails (only if payment was successful)
+        if (isPaymentSuccessful && returnData) {
             console.log('📧 Confirming payment and sending emails...');
             fetch('/api/tilopay/confirm', {
                 method: 'POST',
@@ -190,13 +202,15 @@
                 console.log('✅ Payment confirmed:', data);
                 if (data.success) {
                     console.log('📧 Emails sent successfully!');
+                } else {
+                    console.error('❌ Payment confirmation failed:', data);
                 }
             })
             .catch(error => {
                 console.error('❌ Error confirming payment:', error);
             });
-        } else {
-            console.warn('⚠️ Missing required parameters:', { code, hasReturnData: !!returnData });
+        } else if (!returnData) {
+            console.warn('⚠️ Missing returnData parameter');
         }
     </script>
 </body>

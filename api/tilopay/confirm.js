@@ -53,38 +53,43 @@ export default async function handler(req, res) {
       });
     }
 
-    // code=1 means approved
-    if (code === '1' || code === 1) {
-      // Add payment info to order
-      order.paymentStatus = 'completed';
-      order.paymentId = transactionId;
-      order.paymentMethod = 'Tilopay';
-      order.paidAt = new Date().toISOString();
-
-      console.log(`✅ [Confirm] Order ${orderId} confirmed as paid`);
-
-      // Send emails
-      try {
-        await sendOrderEmail(order);
-        console.log(`📧 [Confirm] Emails sent for order ${orderId}`);
-        
-        return res.json({
-          success: true,
-          message: 'Payment confirmed and emails sent',
-          orderId
-        });
-      } catch (emailError) {
-        console.error(`❌ [Confirm] Failed to send emails:`, emailError);
-        return res.status(500).json({
-          error: 'Failed to send confirmation emails',
-          message: emailError.message
-        });
-      }
-    } else {
-      console.log(`❌ [Confirm] Payment failed for order ${orderId}, code: ${code}`);
-      return res.json({
+    // code=1 means approved, anything else means declined/failed
+    const isPaymentApproved = code === '1' || code === 1;
+    
+    if (!isPaymentApproved) {
+      console.log(`❌ [Confirm] Payment declined for order ${orderId}, code: ${code}`);
+      return res.status(400).json({
         success: false,
-        message: 'Payment was not approved'
+        error: 'Payment declined',
+        message: 'Payment was not approved',
+        code: code
+      });
+    }
+
+    // Payment is approved - process it
+    // Add payment info to order
+    order.paymentStatus = 'completed';
+    order.paymentId = transactionId;
+    order.paymentMethod = 'Tilopay';
+    order.paidAt = new Date().toISOString();
+
+    console.log(`✅ [Confirm] Order ${orderId} confirmed as paid`);
+
+    // Send emails
+    try {
+      await sendOrderEmail(order);
+      console.log(`📧 [Confirm] Emails sent for order ${orderId}`);
+      
+      return res.json({
+        success: true,
+        message: 'Payment confirmed and emails sent',
+        orderId
+      });
+    } catch (emailError) {
+      console.error(`❌ [Confirm] Failed to send emails:`, emailError);
+      return res.status(500).json({
+        error: 'Failed to send confirmation emails',
+        message: emailError.message
       });
     }
 

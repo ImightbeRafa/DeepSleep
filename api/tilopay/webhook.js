@@ -67,7 +67,9 @@ export default async function handler(req, res) {
     const orderId = payload.order || payload.order_id || payload.orderNumber || payload.referencia || payload.reference;
     const transactionId = payload['tilopay-transaction'] || payload.tpt || payload.transaction_id || payload.transaccion_id || payload.id;
     const code = payload.code;
-    const status = code === '1' || code === 1 ? 'approved' : String(payload.estado || payload.status || '').toLowerCase();
+    const status = String(payload.estado || payload.status || '').toLowerCase();
+
+    console.log(`🔍 [Webhook] Payment details - Order: ${orderId}, Code: ${code}, Status: ${status} [${webhookId}]`);
 
     if (!orderId) {
       console.error(`❌ [Webhook] No order ID in payload [${webhookId}]`);
@@ -100,7 +102,10 @@ export default async function handler(req, res) {
     }
 
     // Determine if payment is successful
-    const isSuccess = ['aprobada', 'approved', 'success', 'paid', 'completed'].includes(status);
+    // code=1 or code='1' means approved, anything else means declined/failed
+    const isCodeApproved = code === '1' || code === 1;
+    const isStatusApproved = ['aprobada', 'approved', 'success', 'paid', 'completed'].includes(status);
+    const isSuccess = isCodeApproved || (isStatusApproved && code === undefined);
 
     if (isSuccess) {
       // Mark as processed
@@ -139,27 +144,42 @@ export default async function handler(req, res) {
         webhookId
       });
 
-    } else if (['rechazada', 'declined', 'failed', 'canceled'].includes(status)) {
-      // Payment failed
-      order.processed = true;
-      order.paymentStatus = 'failed';
-      order.paymentId = transactionId;
+    } else {
+      // Payment failed or declined
+      // Check if code indicates failure, or status indicates failure
+      const isCodeDeclined = code !== undefined && code !== '1' && code !== 1;
+      const isStatusDeclined = ['rechazada', 'declined', 'failed', 'canceled', 'cancelled', 'rejected'].includes(status);
+      
+      if (isCodeDeclined || isStatusDeclined) {
+        // Payment failed
+        order.processed = true;
+        order.paymentStatus = 'failed';
+        order.paymentId = transactionId;
 
-      console.log(`❌ [Webhook] Payment failed for order ${orderId} [${webhookId}]`);
+        console.log(`❌ [Webhook] Payment failed for order ${orderId} - Code: ${code}, Status: ${status} [${webhookId}]`);
 
-      return res.json({
-        success: true,
-        orderId,
-        message: 'Payment failed - order cancelled',
-        webhookId
-      });
+        return res.json({
+          success: true,
+          orderId,
+          message: 'Payment failed - order cancelled',
+          paymentStatus: 'failed',
+          code: code,
+          status: status,
+          webhookId
+        });
+      } else {
+        // Unknown status - log it but don't mark as successful
+        console.warn(`⚠️ [Webhook] Unknown payment status for order ${orderId} - Code: ${code}, Status: ${status} [${webhookId}]`);
+        return res.json({
+          success: true,
+          orderId,
+          message: 'Webhook received but status unknown - payment not confirmed',
+          code: code,
+          status: status,
+          webhookId
+        });
+      }
     }
-
-    return res.json({
-      success: true,
-      message: 'Webhook received but status unknown',
-      webhookId
-    });
 
   } catch (error) {
     console.error(`❌ [Webhook] Error [${webhookId}]:`, error);
