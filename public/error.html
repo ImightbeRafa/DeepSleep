@@ -107,7 +107,7 @@
         </div>
         
         <h1>Error en el Pago</h1>
-        <p>Lo sentimos, no pudimos procesar tu pago. Esto puede deberse a:</p>
+        <p id="error-description">Lo sentimos, no pudimos procesar tu pago. Esto puede deberse a:</p>
         
         <ul style="text-align: left; color: #6b7280; margin: 20px 0; padding-left: 40px;">
             <li>Fondos insuficientes</li>
@@ -115,6 +115,11 @@
             <li>Cancelación del pago</li>
             <li>Problema técnico temporal</li>
         </ul>
+        
+        <div id="error-details" style="display: none; background: #fef2f2; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
+            <p style="margin: 0; font-size: 14px;"><strong>Código de error:</strong> <span id="error-code"></span></p>
+            <p id="error-message-row" style="margin: 5px 0 0 0; font-size: 14px; display: none;"><strong>Motivo:</strong> <span id="error-message"></span></p>
+        </div>
         
         <p><strong>No te preocupes, no se realizó ningún cargo.</strong></p>
         
@@ -127,5 +132,41 @@
             <p>Instagram: <a href="https://www.instagram.com/deepsleep.cr/" style="color: #667eea;">@deepsleep.cr</a></p>
         </div>
     </div>
+    
+    <script>
+        // Get error parameters from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('orderId');
+        const code = urlParams.get('code');
+        const description = urlParams.get('description');
+        
+        console.log('❌ [Error Page] Payment failed:', { orderId, code, description });
+        
+        // Show error details if available
+        if (code) {
+            document.getElementById('error-details').style.display = 'block';
+            document.getElementById('error-code').textContent = code;
+            
+            if (description) {
+                document.getElementById('error-message-row').style.display = 'block';
+                document.getElementById('error-message').textContent = decodeURIComponent(description);
+            }
+        }
+        
+        // Map common Tilopay error codes to user-friendly messages
+        const errorMessages = {
+            '2': 'Transacción rechazada por el banco',
+            '3': 'Tarjeta inválida o bloqueada',
+            '4': 'Fondos insuficientes',
+            '5': 'Tarjeta expirada',
+            '6': 'Error de autenticación 3D Secure',
+            '7': 'Transacción cancelada por el usuario',
+            '100': 'Error de procesamiento'
+        };
+        
+        if (code && errorMessages[code]) {
+            document.getElementById('error-description').textContent = errorMessages[code];
+        }
+    </script>
 </body>
 </html>

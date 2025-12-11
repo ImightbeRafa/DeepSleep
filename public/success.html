@@ -149,69 +149,101 @@
     </div>
     
     <script>
-        // Get parameters from URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const orderId = urlParams.get('orderId') || urlParams.get('order');
-        const transactionId = urlParams.get('tilopay-transaction') || urlParams.get('tpt');
-        const code = urlParams.get('code');
-        const returnData = urlParams.get('returnData');
-        
-        console.log('🔍 URL Parameters:', {
-            orderId,
-            transactionId,
-            code,
-            hasReturnData: !!returnData
-        });
-        
-        // Check if payment was actually successful
-        // code=1 means approved, anything else means declined/failed
-        const isPaymentSuccessful = code === '1' || code === 1;
-        
-        if (!isPaymentSuccessful) {
-            // Payment was declined - redirect to error page
-            console.error('❌ Payment declined. Code:', code);
-            const errorUrl = `/error.html?orderId=${orderId || ''}&code=${code || ''}`;
-            window.location.href = errorUrl;
-            return;
-        }
-        
-        // Display order ID
-        if (orderId) {
-            document.getElementById('order-number').textContent = orderId;
-        } else {
-            document.getElementById('order-number').textContent = 'No disponible';
-        }
-        
-        // Confirm payment and send emails (only if payment was successful)
-        if (isPaymentSuccessful && returnData) {
-            console.log('📧 Confirming payment and sending emails...');
-            fetch('/api/tilopay/confirm', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    orderId: orderId,
-                    transactionId: transactionId,
-                    code: code,
-                    returnData: returnData
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('✅ Payment confirmed:', data);
-                if (data.success) {
-                    console.log('📧 Emails sent successfully!');
-                } else {
-                    console.error('❌ Payment confirmation failed:', data);
-                }
-            })
-            .catch(error => {
-                console.error('❌ Error confirming payment:', error);
+        // Immediately execute payment verification
+        (function() {
+            // Get parameters from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('orderId') || urlParams.get('order') || urlParams.get('orderNumber');
+            const transactionId = urlParams.get('tilopay-transaction') || urlParams.get('tpt') || urlParams.get('transactionId');
+            const code = urlParams.get('code');
+            const returnData = urlParams.get('returnData');
+            const description = urlParams.get('description') || urlParams.get('mensaje');
+            
+            console.log('🔍 [Success Page] URL Parameters:', {
+                orderId,
+                transactionId,
+                code,
+                description,
+                hasReturnData: !!returnData,
+                fullUrl: window.location.href
             });
-        } else if (!returnData) {
-            console.warn('⚠️ Missing returnData parameter');
-        }
+            
+            // Check if payment was actually successful
+            // code=1 or code='1' means approved
+            // Any other code (including undefined/null) means we need to verify
+            const isPaymentSuccessful = code === '1' || code === 1 || String(code) === '1';
+            
+            // If code indicates rejection (any non-1 value that exists)
+            const isRejected = code !== null && code !== undefined && code !== '' && !isPaymentSuccessful;
+            
+            console.log('🔍 [Success Page] Payment status check:', {
+                code: code,
+                codeType: typeof code,
+                isPaymentSuccessful,
+                isRejected
+            });
+            
+            if (isRejected) {
+                // Payment was declined - redirect to error page immediately
+                console.error('❌ [Success Page] Payment REJECTED. Code:', code, 'Description:', description);
+                const errorParams = new URLSearchParams({
+                    orderId: orderId || '',
+                    code: code || '',
+                    description: description || 'Pago rechazado'
+                });
+                window.location.replace('/error.html?' + errorParams.toString());
+                return; // Stop execution
+            }
+            
+            // If no code parameter at all, this might be a direct visit or error
+            if (code === null || code === undefined || code === '') {
+                console.warn('⚠️ [Success Page] No payment code received - cannot verify payment status');
+                // Show warning but don't redirect - let user see the page
+                document.getElementById('order-number').textContent = orderId || 'Verificando...';
+                return;
+            }
+            
+            // Payment is successful - continue with normal flow
+            console.log('✅ [Success Page] Payment APPROVED. Code:', code);
+            
+            // Display order ID
+            if (orderId) {
+                document.getElementById('order-number').textContent = orderId;
+            } else {
+                document.getElementById('order-number').textContent = 'No disponible';
+            }
+            
+            // Confirm payment, send emails, and sync to Betsy CRM
+            if (returnData) {
+                console.log('📧 [Success Page] Confirming payment and processing order...');
+                fetch('/api/tilopay/confirm', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        orderId: orderId,
+                        transactionId: transactionId,
+                        code: code,
+                        returnData: returnData
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('✅ [Success Page] Order processed:', data);
+                    if (data.success) {
+                        console.log('📧 [Success Page] Emails sent and order synced to CRM!');
+                    } else {
+                        console.error('❌ [Success Page] Order processing failed:', data);
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ [Success Page] Error processing order:', error);
+                });
+            } else {
+                console.warn('⚠️ [Success Page] Missing returnData parameter - cannot process order');
+            }
+        })();
     </script>
 </body>
 </html>

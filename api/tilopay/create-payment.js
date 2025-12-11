@@ -144,6 +144,7 @@ export default async function handler(req, res) {
     const lastName = nameParts.slice(1).join(' ') || nombre;
 
     // Encode order data to pass through Tilopay redirect
+    // Include all fields needed for email and Betsy CRM
     const orderData = {
       orderId,
       nombre,
@@ -154,8 +155,11 @@ export default async function handler(req, res) {
       distrito,
       direccion,
       cantidad: quantity,
+      subtotal,
+      shippingCost,
       total,
-      comentarios
+      comentarios,
+      createdAt: new Date().toISOString()
     };
     const encodedOrderData = Buffer.from(JSON.stringify(orderData)).toString('base64');
 
@@ -164,6 +168,7 @@ export default async function handler(req, res) {
       amount: Math.round(total),
       currency: 'CRC',
       redirect: `${appUrl}/success.html`,
+      hashVersion: 'V2',
       billToFirstName: firstName,
       billToLastName: lastName,
       billToAddress: direccion,

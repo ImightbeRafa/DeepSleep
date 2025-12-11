@@ -1,7 +1,8 @@
 import { sendOrderEmail } from '../utils/email.js';
+import { sendOrderToBetsyWithRetry } from '../utils/betsy.js';
 
 /**
- * Confirm payment and send emails
+ * Confirm payment and send emails, then sync order to Betsy CRM
  * Called from success page after Tilopay redirect
  */
 export default async function handler(req, res) {
@@ -79,19 +80,29 @@ export default async function handler(req, res) {
     try {
       await sendOrderEmail(order);
       console.log(`📧 [Confirm] Emails sent for order ${orderId}`);
-      
-      return res.json({
-        success: true,
-        message: 'Payment confirmed and emails sent',
-        orderId
-      });
     } catch (emailError) {
       console.error(`❌ [Confirm] Failed to send emails:`, emailError);
-      return res.status(500).json({
-        error: 'Failed to send confirmation emails',
-        message: emailError.message
-      });
+      // Don't fail the whole process if email fails - continue to Betsy sync
     }
+
+    // Send order to Betsy CRM
+    try {
+      await sendOrderToBetsyWithRetry({
+        ...order,
+        paymentMethod: 'Tilopay',
+        transactionId: transactionId
+      });
+      console.log(`✅ [Confirm] Order synced to Betsy CRM: ${orderId}`);
+    } catch (betsyError) {
+      console.error(`❌ [Confirm] Failed to sync order to Betsy CRM:`, betsyError);
+      // Don't fail the webhook if Betsy sync fails - just log it
+    }
+
+    return res.json({
+      success: true,
+      message: 'Payment confirmed, emails sent, and order synced to CRM',
+      orderId
+    });
 
   } catch (error) {
     console.error(`❌ [Confirm] Error:`, error);
