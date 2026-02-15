@@ -14,7 +14,7 @@ const pricing = {
 };
 
 // Shipping costs
-const SHIPPING_COST = 2500; // ₡2,500 for single items only
+const SHIPPING_COST = 2600; // ₡2,600 for all orders
 
 // Smooth scrolling for navigation links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -43,8 +43,8 @@ function updateTotal() {
     const subtotal = pricing[quantity] || pricing[1];
     const unitPrice = pricing[1];
     
-    // Add shipping cost only for single items
-    const shippingCost = quantity === 1 ? SHIPPING_COST : 0;
+    // Shipping cost applies to all orders
+    const shippingCost = SHIPPING_COST;
     const total = subtotal + shippingCost;
     
     // Update quantity and total display
@@ -68,17 +68,7 @@ function updateTotal() {
     
     if (shippingElement) {
         const shippingSpan = shippingElement.querySelector('span:last-child');
-        if (quantity === 1) {
-            shippingSpan.textContent = `₡${shippingCost.toLocaleString('es-CR')}`;
-            shippingSpan.className = ''; // Remove any 'free' class
-            shippingSpan.style.color = '';
-            shippingSpan.style.fontWeight = '';
-        } else {
-            shippingSpan.textContent = 'GRATIS';
-            shippingSpan.className = 'free';
-            shippingSpan.style.color = '#059669';
-            shippingSpan.style.fontWeight = 'bold';
-        }
+        shippingSpan.textContent = `₡${shippingCost.toLocaleString('es-CR')}`;
     }
     
     // Calculate and show savings for multiple units
