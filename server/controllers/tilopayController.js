@@ -56,20 +56,13 @@ export async function createPaymentLink(req, res) {
       });
     }
 
-    // Calculate total with tiered pricing
-    const pricing = {
-      1: 9900,   // 1 unit: ₡9.900
-      2: 16900,  // 2 units: ₡16.900
-      3: 23900,  // 3 units: ₡23.900
-      4: 30900,  // 4 units: ₡30.900
-      5: 37900   // 5 units: ₡37.900
-    };
-    
+    // Calculate total - flat pricing, no volume discount
+    const UNIT_PRICE = 9900; // ₡9,900 per unit
     const quantity = parseInt(cantidad) || 1;
-    const subtotal = pricing[quantity] || pricing[1];
+    const subtotal = UNIT_PRICE * quantity;
     
-    // Add shipping cost (₡2,500) only for single items
-    const shippingCost = quantity === 1 ? 2500 : 0;
+    // Shipping: ₡3,000 for 1 unit, FREE for 2+
+    const shippingCost = quantity >= 2 ? 0 : 3000;
     const total = subtotal + shippingCost;
 
     // Generate unique order ID
