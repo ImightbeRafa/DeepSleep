@@ -7,6 +7,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Meta Pixel Code -->
+    <script>
+    !function(f,b,e,v,n,t,s)
+    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+    n.queue=[];t=b.createElement(e);t.async=!0;
+    t.src=v;s=b.getElementsByTagName(e)[0];
+    s.parentNode.insertBefore(t,s)}(window, document,'script',
+    'https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', '1427621532377785');
+    fbq('track', 'PageView');
+    </script>
+    <!-- End Meta Pixel Code -->
     <style>
         * {
             margin: 0;
@@ -122,6 +136,9 @@
     </style>
 </head>
 <body>
+    <noscript><img height="1" width="1" style="display:none"
+    src="https://www.facebook.com/tr?id=1427621532377785&ev=PageView&noscript=1"
+    /></noscript>
     <div class="success-container">
         <div class="success-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -213,6 +230,39 @@
                 document.getElementById('order-number').textContent = 'No disponible';
             }
             
+            // --- Meta Pixel Purchase tracking helpers ---
+            function metaTrack(eventName, params, options) {
+                try {
+                    if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+                        if (params && options) { window.fbq('track', eventName, params, options); return; }
+                        if (params) { window.fbq('track', eventName, params); return; }
+                        window.fbq('track', eventName);
+                    }
+                } catch (e) {}
+            }
+
+            var metaEventId = 'purchase_' + (orderId || '') + '_' + (transactionId || '');
+            var purchaseStorageKey = 'meta_purchase_' + (orderId || '') + '_' + (transactionId || '');
+
+            function trackPurchaseOnce() {
+                if (sessionStorage.getItem(purchaseStorageKey)) return;
+                if (!returnData) return;
+                try {
+                    var decoded = atob(returnData);
+                    var order = JSON.parse(decoded);
+                    if (!order || !order.total) return;
+                    var quantity = parseInt(order.cantidad, 10) || 1;
+                    metaTrack('Purchase', {
+                        value: Number(order.total) || 0,
+                        currency: 'CRC',
+                        content_ids: ['deepsleep-bucal'],
+                        content_type: 'product',
+                        num_items: quantity
+                    }, { eventID: metaEventId });
+                    sessionStorage.setItem(purchaseStorageKey, '1');
+                } catch (e) {}
+            }
+
             // Confirm payment, send emails, and sync to Betsy CRM
             if (returnData) {
                 console.log('📧 [Success Page] Confirming payment and processing order...');
@@ -231,8 +281,9 @@
                 .then(response => response.json())
                 .then(data => {
                     console.log('✅ [Success Page] Order processed:', data);
-                    if (data.success) {
+                    if (data.success || data.alreadyProcessed) {
                         console.log('📧 [Success Page] Emails sent and order synced to CRM!');
+                        trackPurchaseOnce();
                     } else {
                         console.error('❌ [Success Page] Order processing failed:', data);
                     }

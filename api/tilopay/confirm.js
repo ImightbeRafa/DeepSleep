@@ -1,5 +1,6 @@
 import { sendOrderEmail } from '../utils/email.js';
 import { sendOrderToBetsyWithRetry } from '../utils/betsy.js';
+import { sendMetaEvent, generateEventId } from '../utils/meta.js';
 
 /**
  * Confirm payment and send emails, then sync order to Betsy CRM
@@ -97,6 +98,18 @@ export default async function handler(req, res) {
       console.error(`❌ [Confirm] Failed to sync order to Betsy CRM:`, betsyError);
       // Don't fail the webhook if Betsy sync fails - just log it
     }
+
+    // Fire Meta CAPI Purchase event (server-side, deduped with browser success.html)
+    const appUrl = (process.env.APP_URL || 'https://deepsleep.shopping').replace(/\/+$/, '');
+    const metaEventId = generateEventId('purchase', orderId, transactionId);
+    const quantity = parseInt(order.cantidad, 10) || 1;
+    sendMetaEvent('Purchase', metaEventId, order, req, {
+      value: order.total || 0,
+      currency: 'CRC',
+      content_ids: ['deepsleep-bucal'],
+      content_type: 'product',
+      num_items: quantity
+    }, `${appUrl}/success.html`).catch(() => {});
 
     return res.json({
       success: true,

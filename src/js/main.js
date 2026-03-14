@@ -10,6 +10,76 @@ const UNIT_PRICE = 9900; // ₡9,900 per unit, no volume discount
 // Shipping costs
 const SHIPPING_COST = 3000; // ₡3,000 for 1 unit, FREE for 2+
 
+// --- Meta Pixel tracking helpers ---
+function metaTrack(eventName, params, options) {
+    try {
+        if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+            if (params && options) {
+                window.fbq('track', eventName, params, options);
+            } else if (params) {
+                window.fbq('track', eventName, params);
+            } else {
+                window.fbq('track', eventName);
+            }
+        }
+    } catch (e) {
+        // no-op — never break the site if Pixel fails
+    }
+}
+
+function getOrderMetaValue() {
+    const quantity = parseInt(document.getElementById('cantidad')?.value) || 1;
+    const subtotal = UNIT_PRICE * quantity;
+    const shippingCost = quantity >= 2 ? 0 : SHIPPING_COST;
+    return subtotal + shippingCost;
+}
+
+function getOrderQuantity() {
+    return parseInt(document.getElementById('cantidad')?.value) || 1;
+}
+
+// ViewContent — fires once when product section scrolls into view
+(function setupViewContentObserver() {
+    if (typeof IntersectionObserver === 'undefined') return;
+    const productSection = document.getElementById('producto');
+    if (!productSection) return;
+    let hasFired = false;
+    const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (!entry.isIntersecting || hasFired) return;
+            hasFired = true;
+            metaTrack('ViewContent', {
+                content_ids: ['deepsleep-bucal'],
+                content_name: 'DeepSleep Bucal Anti-Ronquidos',
+                content_type: 'product',
+                value: UNIT_PRICE,
+                currency: 'CRC'
+            });
+            observer.disconnect();
+        });
+    }, { threshold: 0.3 });
+    observer.observe(productSection);
+})();
+
+// AddToCart — fires on first quantity selector interaction
+(function setupAddToCartTracking() {
+    const qtySelect = document.getElementById('cantidad');
+    if (!qtySelect) return;
+    let hasTrackedAddToCart = false;
+    qtySelect.addEventListener('change', function() {
+        if (hasTrackedAddToCart) return;
+        hasTrackedAddToCart = true;
+        const quantity = parseInt(qtySelect.value) || 1;
+        metaTrack('AddToCart', {
+            content_ids: ['deepsleep-bucal'],
+            content_name: 'DeepSleep Bucal Anti-Ronquidos',
+            content_type: 'product',
+            value: UNIT_PRICE * quantity,
+            currency: 'CRC'
+        });
+    });
+})();
+
 // Smooth scrolling for navigation links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
@@ -142,6 +212,14 @@ if (orderForm) {
         
         try {
             if (paymentMethod === 'SINPE') {
+                // InitiateCheckout for SINPE — no server mirror, fire before API call
+                metaTrack('InitiateCheckout', {
+                    content_ids: ['deepsleep-bucal'],
+                    content_type: 'product',
+                    num_items: getOrderQuantity(),
+                    value: getOrderMetaValue(),
+                    currency: 'CRC'
+                });
                 await handleSinpePayment(data);
             } else if (paymentMethod === 'Tarjeta') {
                 await handleTilopayPayment(data);
@@ -179,6 +257,12 @@ async function handleSinpePayment(data) {
             paymentInfoBox.style.display = 'none';
         }
         
+        // Lead event for SINPE (alternative payment confirmation)
+        metaTrack('Lead', {
+            value: getOrderMetaValue(),
+            currency: 'CRC'
+        });
+
         // Show success message
         showMessage(`¡Pedido recibido! Número de orden: ${result.orderId}. Revise su correo para las instrucciones de pago SINPE.`, 'success');
         
@@ -213,8 +297,17 @@ async function handleTilopayPayment(data) {
         
         showLoading(false);
         
-        // Redirect to Tilopay payment page
+        // InitiateCheckout for Tarjeta — with server dedup eventID
         if (result.paymentUrl) {
+            if (result.metaEventId) {
+                metaTrack('InitiateCheckout', {
+                    content_ids: ['deepsleep-bucal'],
+                    content_type: 'product',
+                    num_items: getOrderQuantity(),
+                    value: getOrderMetaValue(),
+                    currency: 'CRC'
+                }, { eventID: result.metaEventId });
+            }
             window.location.href = result.paymentUrl;
         } else {
             throw new Error('No payment URL received');

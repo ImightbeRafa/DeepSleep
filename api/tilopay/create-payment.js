@@ -1,4 +1,5 @@
 import { sendOrderEmail } from '../utils/email.js';
+import { sendMetaEvent, generateEventId } from '../utils/meta.js';
 
 /**
  * Authenticate with Tilopay API
@@ -211,9 +212,20 @@ export default async function handler(req, res) {
       throw new Error('No payment URL received from Tilopay');
     }
 
+    // Fire Meta CAPI InitiateCheckout event (server-side, deduped with browser)
+    const metaEventId = generateEventId('ic', orderId);
+    sendMetaEvent('InitiateCheckout', metaEventId, orderData, req, {
+      value: total,
+      currency: 'CRC',
+      content_ids: ['deepsleep-bucal'],
+      content_type: 'product',
+      num_items: quantity
+    }, `${appUrl}/#pedido`).catch(() => {});
+
     return res.json({
       success: true,
       orderId,
+      metaEventId,
       paymentUrl: paymentUrl,
       transactionId: paymentData.id || paymentData.transaction_id
     });
