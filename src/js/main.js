@@ -362,3 +362,40 @@ document.addEventListener('DOMContentLoaded', function() {
     updateTotal();
 });
 
+// --- Sticky CTA bar show/hide ---
+(function setupStickyCta() {
+    const stickyBar = document.getElementById('sticky-cta');
+    if (!stickyBar) return;
+
+    let heroPast = false;
+    let orderVisible = false;
+
+    function updateBar() {
+        if (heroPast && !orderVisible) {
+            stickyBar.classList.add('visible');
+            document.body.classList.add('has-sticky-cta');
+        } else {
+            stickyBar.classList.remove('visible');
+            document.body.classList.remove('has-sticky-cta');
+        }
+    }
+
+    // Observer A — hero CTA buttons: show bar once they scroll out of view
+    const heroButtons = document.querySelector('.cta-buttons');
+    if (heroButtons) {
+        new IntersectionObserver(function(entries) {
+            heroPast = !entries[0].isIntersecting;
+            updateBar();
+        }, { threshold: 0 }).observe(heroButtons);
+    }
+
+    // Observer B — order form section: hide bar when form is on screen
+    const orderSection = document.getElementById('pedido');
+    if (orderSection) {
+        new IntersectionObserver(function(entries) {
+            orderVisible = entries[0].isIntersecting;
+            updateBar();
+        }, { threshold: 0.1 }).observe(orderSection);
+    }
+})();
+

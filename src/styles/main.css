@@ -1268,6 +1268,81 @@ section {
     font-weight: 500;
 }
 
+/* Sticky CTA Bar */
+.sticky-cta {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 999;
+    background: var(--color-text);
+    padding: 0.625rem 0;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+
+.sticky-cta.visible {
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.sticky-cta-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 var(--spacing-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sticky-cta-left {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.sticky-cta-label {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: 0.03em;
+}
+
+.sticky-cta-price {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--color-white);
+    line-height: 1;
+}
+
+.sticky-cta-btn {
+    padding: 0.55rem 1.75rem;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    border-radius: 8px;
+    letter-spacing: 0.02em;
+}
+
+body.has-sticky-cta {
+    padding-bottom: 56px;
+}
+
+@media (max-width: 480px) {
+    .sticky-cta-inner {
+        padding: 0 var(--spacing-sm);
+    }
+
+    .sticky-cta-price {
+        font-size: 1.05rem;
+    }
+
+    .sticky-cta-btn {
+        padding: 0.5rem 1.25rem;
+        font-size: 0.85rem;
+    }
+}
+
 /* Responsive Modal */
 @media (max-width: 768px) {
     .modal-content {
