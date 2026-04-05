@@ -1099,11 +1099,6 @@ section {
     margin-bottom: 0.5rem;
 }
 
-.payment-instructions.sinpe {
-    border-color: #10b981;
-    background: linear-gradient(135deg, #10b98115 0%, #059669 15 100%);
-}
-
 .payment-instructions.tilopay {
     border-color: #667eea;
 }
@@ -1188,33 +1183,6 @@ section {
     margin-top: 0.5rem;
 }
 
-.sinpe-instructions {
-    margin-top: var(--spacing-md);
-}
-
-.sinpe-instructions h3 {
-    color: var(--color-primary);
-    margin-bottom: var(--spacing-sm);
-}
-
-.sinpe-instructions ol {
-    margin: var(--spacing-sm) 0;
-    padding-left: var(--spacing-md);
-}
-
-.sinpe-instructions ol li {
-    margin-bottom: var(--spacing-sm);
-    line-height: 1.6;
-}
-
-.sinpe-instructions code {
-    background: #f3f4f6;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-family: 'Courier New', monospace;
-    color: #667eea;
-    font-weight: 600;
-}
 
 .warning-box {
     background: #fef3c7;
