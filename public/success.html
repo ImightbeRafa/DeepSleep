@@ -17,7 +17,7 @@
     t.src=v;s=b.getElementsByTagName(e)[0];
     s.parentNode.insertBefore(t,s)}(window, document,'script',
     'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '1427621532377785');
+    fbq('init', '1710686599976070');
     fbq('track', 'PageView');
     </script>
     <!-- End Meta Pixel Code -->
@@ -133,13 +133,45 @@
             font-size: 14px;
             margin-bottom: 10px;
         }
+
+        .loading-icon {
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=1427621532377785&ev=PageView&noscript=1"
+    src="https://www.facebook.com/tr?id=1710686599976070&ev=PageView&noscript=1"
     /></noscript>
-    <div class="success-container">
+    <!-- Loading state (shown by default) -->
+    <div id="verifying-container" class="success-container">
+        <div class="loading-icon">
+            <div class="spinner"></div>
+        </div>
+        <h1>Verificando tu pago...</h1>
+        <p>Por favor espera mientras confirmamos tu transacción.</p>
+    </div>
+
+    <!-- Success state (hidden until confirmed) -->
+    <div id="success-container" class="success-container" style="display: none;">
         <div class="success-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                 <polyline points="20 6 9 17 4 12"></polyline>
@@ -151,7 +183,7 @@
         
         <div class="order-id">
             <label>Número de Orden</label>
-            <strong id="order-number">Cargando...</strong>
+            <strong id="order-number">—</strong>
         </div>
         
         <p>Recibirás un correo electrónico con los detalles de tu pedido. Te contactaremos pronto para coordinar el envío.</p>
@@ -169,68 +201,52 @@
         // Immediately execute payment verification
         (function() {
             // Get parameters from URL
-            const urlParams = new URLSearchParams(window.location.search);
-            const orderId = urlParams.get('orderId') || urlParams.get('order') || urlParams.get('orderNumber');
-            const transactionId = urlParams.get('tilopay-transaction') || urlParams.get('tpt') || urlParams.get('transactionId');
-            const code = urlParams.get('code');
-            const returnData = urlParams.get('returnData');
-            const description = urlParams.get('description') || urlParams.get('mensaje');
-            
+            var urlParams = new URLSearchParams(window.location.search);
+            var orderId = urlParams.get('orderId') || urlParams.get('order') || urlParams.get('orderNumber');
+            var transactionId = urlParams.get('tilopay-transaction') || urlParams.get('tpt') || urlParams.get('transactionId');
+            var code = urlParams.get('code');
+            var returnData = urlParams.get('returnData');
+            var description = urlParams.get('description') || urlParams.get('mensaje');
+
             console.log('🔍 [Success Page] URL Parameters:', {
-                orderId,
-                transactionId,
-                code,
-                description,
+                orderId: orderId,
+                transactionId: transactionId,
+                code: code,
+                description: description,
                 hasReturnData: !!returnData,
                 fullUrl: window.location.href
             });
-            
-            // Check if payment was actually successful
-            // code=1 or code='1' means approved
-            // Any other code (including undefined/null) means we need to verify
-            const isPaymentSuccessful = code === '1' || code === 1 || String(code) === '1';
-            
-            // If code indicates rejection (any non-1 value that exists)
-            const isRejected = code !== null && code !== undefined && code !== '' && !isPaymentSuccessful;
-            
-            console.log('🔍 [Success Page] Payment status check:', {
-                code: code,
-                codeType: typeof code,
-                isPaymentSuccessful,
-                isRejected
-            });
-            
-            if (isRejected) {
-                // Payment was declined - redirect to error page immediately
-                console.error('❌ [Success Page] Payment REJECTED. Code:', code, 'Description:', description);
-                const errorParams = new URLSearchParams({
+
+            // ── GATE 1: code must be exactly '1' (Tilopay approved) ──
+            var isApproved = (code === '1' || code === 1 || String(code) === '1');
+
+            if (!isApproved) {
+                // Any other situation: missing code, code=2, code=null, direct visit, etc.
+                console.error('❌ [Success Page] Payment NOT approved. Code:', code, 'Redirecting to error page.');
+                var errorParams = new URLSearchParams({
                     orderId: orderId || '',
-                    code: code || '',
-                    description: description || 'Pago rechazado'
+                    code: code || '0',
+                    description: description || 'El pago no fue completado o fue rechazado.'
                 });
                 window.location.replace('/error.html?' + errorParams.toString());
-                return; // Stop execution
-            }
-            
-            // If no code parameter at all, this might be a direct visit or error
-            if (code === null || code === undefined || code === '') {
-                console.warn('⚠️ [Success Page] No payment code received - cannot verify payment status');
-                // Show warning but don't redirect - let user see the page
-                document.getElementById('order-number').textContent = orderId || 'Verificando...';
                 return;
             }
-            
-            // Payment is successful - continue with normal flow
-            console.log('✅ [Success Page] Payment APPROVED. Code:', code);
-            
-            // Display order ID
-            if (orderId) {
-                document.getElementById('order-number').textContent = orderId;
-            } else {
-                document.getElementById('order-number').textContent = 'No disponible';
+
+            // ── GATE 2: returnData must be present to confirm the order ──
+            if (!returnData) {
+                console.error('❌ [Success Page] No returnData — cannot verify order. Redirecting.');
+                var errorParams2 = new URLSearchParams({
+                    orderId: orderId || '',
+                    code: code || '',
+                    description: 'No se pudo verificar la información del pedido.'
+                });
+                window.location.replace('/error.html?' + errorParams2.toString());
+                return;
             }
-            
-            // --- Meta Pixel Purchase tracking helpers ---
+
+            console.log('✅ [Success Page] Payment code APPROVED. Verifying with server...');
+
+            // ── Meta Pixel helpers ──
             function metaTrack(eventName, params, options) {
                 try {
                     if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
@@ -263,37 +279,48 @@
                 } catch (e) {}
             }
 
-            // Confirm payment, send emails, and sync to Betsy CRM
-            if (returnData) {
-                console.log('📧 [Success Page] Confirming payment and processing order...');
-                fetch('/api/tilopay/confirm', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        orderId: orderId,
-                        transactionId: transactionId,
-                        code: code,
-                        returnData: returnData
-                    })
+            // ── GATE 3: Server-side confirmation — only show success if server says OK ──
+            console.log('📧 [Success Page] Confirming payment with server...');
+            fetch('/api/tilopay/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: orderId,
+                    transactionId: transactionId,
+                    code: code,
+                    returnData: returnData
                 })
-                .then(response => response.json())
-                .then(data => {
-                    console.log('✅ [Success Page] Order processed:', data);
-                    if (data.success || data.alreadyProcessed) {
-                        console.log('📧 [Success Page] Emails sent and order synced to CRM!');
-                        trackPurchaseOnce();
-                    } else {
-                        console.error('❌ [Success Page] Order processing failed:', data);
-                    }
-                })
-                .catch(error => {
-                    console.error('❌ [Success Page] Error processing order:', error);
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                console.log('📬 [Success Page] Server response:', data);
+                if (data.success || data.alreadyProcessed) {
+                    // ✅ Server confirmed — reveal success UI
+                    document.getElementById('order-number').textContent = orderId || 'Confirmado';
+                    document.getElementById('verifying-container').style.display = 'none';
+                    document.getElementById('success-container').style.display = 'block';
+                    trackPurchaseOnce();
+                    console.log('✅ [Success Page] Payment verified and confirmed!');
+                } else {
+                    // Server rejected the confirmation
+                    console.error('❌ [Success Page] Server rejected confirmation:', data);
+                    var errorParams3 = new URLSearchParams({
+                        orderId: orderId || '',
+                        code: code || '',
+                        description: data.message || 'El servidor no pudo confirmar el pago.'
+                    });
+                    window.location.replace('/error.html?' + errorParams3.toString());
+                }
+            })
+            .catch(function(error) {
+                console.error('❌ [Success Page] Confirm request failed:', error);
+                var errorParams4 = new URLSearchParams({
+                    orderId: orderId || '',
+                    code: code || '',
+                    description: 'Error de conexión al verificar el pago. Contacte soporte.'
                 });
-            } else {
-                console.warn('⚠️ [Success Page] Missing returnData parameter - cannot process order');
-            }
+                window.location.replace('/error.html?' + errorParams4.toString());
+            });
         })();
     </script>
 </body>

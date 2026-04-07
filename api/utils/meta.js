@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-const PIXEL_ID = '1427621532377785';
+const PIXEL_ID = process.env.META_PIXEL_ID || '1710686599976070';
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}/${PIXEL_ID}/events`;
 
