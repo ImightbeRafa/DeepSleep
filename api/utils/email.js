@@ -1,4 +1,85 @@
 /**
+ * Resend idempotency keys are kept for 24 hours and prevent duplicate sends
+ * when the success page and payment webhook process the same order.
+ */
+function getEmailIdempotencyKey(order, emailType) {
+  const orderRef = order?.orderId || order?.paymentId || order?.transactionId;
+
+  if (!orderRef) {
+    return null;
+  }
+
+  const safeOrderRef = String(orderRef).replace(/[^a-zA-Z0-9._:-]/g, '-');
+  return `deepsleep/order-confirmation/${emailType}/${safeOrderRef}`.slice(0, 256);
+}
+
+async function parseResendError(response) {
+  const body = await response.text();
+
+  try {
+    return {
+      body,
+      data: JSON.parse(body)
+    };
+  } catch {
+    return {
+      body,
+      data: null
+    };
+  }
+}
+
+function isIdempotencyConflict(response, errorBody, errorData) {
+  if (response.status !== 409) {
+    return false;
+  }
+
+  const errorType = String(
+    errorData?.type || errorData?.name || errorData?.error || ''
+  ).toLowerCase();
+  const message = String(errorData?.message || errorBody || '').toLowerCase();
+
+  return errorType.includes('idempotent') ||
+    errorType.includes('idempotency') ||
+    message.includes('idempotent') ||
+    message.includes('idempotency');
+}
+
+async function sendResendEmail({ resendApiKey, idempotencyKey, payload }) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${resendApiKey}`
+  };
+
+  if (idempotencyKey) {
+    headers['Idempotency-Key'] = idempotencyKey;
+  }
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const { body, data } = await parseResendError(response);
+
+    if (isIdempotencyConflict(response, body, data)) {
+      console.warn('Duplicate email suppressed by Resend idempotency key:', idempotencyKey);
+      return {
+        duplicate: true,
+        idempotencyKey,
+        resendError: data || body
+      };
+    }
+
+    throw new Error(`Failed to send email: ${body || response.statusText}`);
+  }
+
+  return await response.json();
+}
+
+/**
  * Send customer confirmation email
  */
 async function sendCustomerEmail(order) {
@@ -73,25 +154,18 @@ async function sendCustomerEmail(order) {
     </html>
   `;
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${resendApiKey}`
-    },
-    body: JSON.stringify({
+  const result = await sendResendEmail({
+    resendApiKey,
+    idempotencyKey: getEmailIdempotencyKey(order, 'customer'),
+    payload: {
       from: 'DeepSleep <ordenes@betsycrm.com>',
       to: order.email,
       subject: `Confirmación de Pedido ${order.orderId} - DeepSleep`,
       html: customerEmailHtml
-    })
+    }
   });
 
-  if (!response.ok) {
-    throw new Error('Failed to send customer email');
-  }
-
-  return await response.json();
+  return result;
 }
 
 /**
@@ -171,25 +245,18 @@ async function sendAdminEmail(order) {
       </html>
     `;
 
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${resendApiKey}`
-      },
-      body: JSON.stringify({
+    const result = await sendResendEmail({
+      resendApiKey,
+      idempotencyKey: getEmailIdempotencyKey(order, 'admin'),
+      payload: {
         from: 'DeepSleep <ordenes@betsycrm.com>',
         to: notificationEmail,
         subject: `Nueva Orden: ${order.orderId} - ${order.nombre}`,
         html: adminEmailHtml
-      })
+      }
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to send admin email');
-    }
-
-    return await response.json();
+    return result;
 }
 
 /**

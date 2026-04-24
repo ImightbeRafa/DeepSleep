@@ -1,10 +1,8 @@
 import { sendOrderEmail } from '../utils/email.js';
 import { sendOrderToBetsyWithRetry } from '../utils/betsy.js';
 import { sendMetaEvent, generateEventId } from '../utils/meta.js';
+import { decodeOrderReturnData } from '../utils/orderReturnData.js';
 
-/**
- * Verify webhook signature
- */
 function verifyWebhookSignature(req) {
   const expectedSecret = process.env.TILOPAY_WEBHOOK_SECRET || '';
   const providedSecret = req.headers['x-tilopay-secret'] || '';
@@ -21,11 +19,50 @@ function verifyWebhookSignature(req) {
   return false;
 }
 
-/**
- * Vercel Serverless Function - Webhook Handler
- */
+function getReturnData(payload) {
+  return payload.returnData ||
+    payload.return_data ||
+    payload.return ||
+    payload.ReturnData ||
+    payload.RETURNDATA ||
+    null;
+}
+
+function getStoredOrder(orderId, payload) {
+  if (!global.pendingOrders) {
+    global.pendingOrders = {};
+  }
+
+  if (orderId && global.pendingOrders[orderId]) {
+    return global.pendingOrders[orderId];
+  }
+
+  const returnData = getReturnData(payload);
+  if (!returnData) {
+    return null;
+  }
+
+  try {
+    const order = decodeOrderReturnData(returnData);
+    if (orderId && order.orderId && String(order.orderId) !== String(orderId)) {
+      console.error(`[Webhook] returnData order mismatch. Webhook: ${orderId}, returnData: ${order.orderId}`);
+      return null;
+    }
+
+    const resolvedOrderId = order.orderId || orderId;
+    if (resolvedOrderId) {
+      global.pendingOrders[resolvedOrderId] = order;
+    }
+
+    console.log(`[Webhook] Order data recovered from returnData for order ${resolvedOrderId || 'unknown'}`);
+    return order;
+  } catch (error) {
+    console.error('[Webhook] Failed to decode returnData:', error);
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
-  // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -36,7 +73,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  // GET request for testing
   if (req.method === 'GET') {
     return res.json({
       status: 'ok',
@@ -50,51 +86,59 @@ export default async function handler(req, res) {
   }
 
   const webhookId = `wh_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-  console.log(`📨 [Webhook] Received payment notification [${webhookId}]`);
+  console.log(`[Webhook] Received payment notification [${webhookId}]`);
 
   try {
-    const payload = req.body;
-    console.log(`📦 [Webhook] Headers:`, JSON.stringify(req.headers, null, 2));
-    console.log(`📦 [Webhook] Payload:`, JSON.stringify(payload, null, 2));
-    
-    // Verify webhook authenticity (optional for now during testing)
+    const payload = req.body || {};
+    console.log('[Webhook] Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('[Webhook] Payload:', JSON.stringify(payload, null, 2));
+
     const isVerified = verifyWebhookSignature(req);
     if (!isVerified) {
-      console.warn(`⚠️ [Webhook] Signature not verified, processing anyway [${webhookId}]`);
+      console.warn(`[Webhook] Signature not verified, processing anyway [${webhookId}]`);
     }
 
-    // Extract data from webhook payload
     const orderId = payload.order || payload.order_id || payload.orderNumber || payload.referencia || payload.reference;
     const transactionId = payload['tilopay-transaction'] || payload.tpt || payload.transaction_id || payload.transaccion_id || payload.id;
     const code = payload.code;
     const status = String(payload.estado || payload.status || '').toLowerCase();
 
-    console.log(`🔍 [Webhook] Payment details - Order: ${orderId}, Code: ${code}, Status: ${status} [${webhookId}]`);
+    console.log(`[Webhook] Payment details - Order: ${orderId}, Code: ${code}, Status: ${status} [${webhookId}]`);
 
     if (!orderId) {
-      console.error(`❌ [Webhook] No order ID in payload [${webhookId}]`);
+      console.error(`[Webhook] No order ID in payload [${webhookId}]`);
       return res.status(400).json({ error: 'No order ID' });
     }
 
-    // Get order data from global storage
-    if (!global.pendingOrders) {
-      global.pendingOrders = {};
-    }
-    
-    const order = global.pendingOrders[orderId];
+    const isCodeApproved = code === '1' || code === 1;
+    const isStatusApproved = ['aprobada', 'approved', 'success', 'paid', 'completed'].includes(status);
+    const isSuccess = isCodeApproved || (isStatusApproved && code === undefined);
+    const isCodeDeclined = code !== undefined && code !== '1' && code !== 1;
+    const isStatusDeclined = ['rechazada', 'declined', 'failed', 'canceled', 'cancelled', 'rejected'].includes(status);
+
+    const order = getStoredOrder(orderId, payload);
 
     if (!order) {
-      console.error(`❌ [Webhook] Order not found: ${orderId} [${webhookId}]`);
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Order not found but webhook acknowledged' 
+      console.error(`[Webhook] Order data unavailable: ${orderId} [${webhookId}]`);
+      if (isSuccess) {
+        return res.status(500).json({
+          success: false,
+          error: 'Order data unavailable for paid order',
+          orderId,
+          webhookId
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: 'Order data unavailable for non-approved payment',
+        orderId,
+        webhookId
       });
     }
 
-    // Check if already processed
     if (order.processed) {
-      console.log(`⚠️ [Webhook] Order already processed: ${orderId} [${webhookId}]`);
+      console.log(`[Webhook] Order already processed: ${orderId} [${webhookId}]`);
       return res.json({
         success: true,
         message: 'Order already processed',
@@ -102,43 +146,32 @@ export default async function handler(req, res) {
       });
     }
 
-    // Determine if payment is successful
-    // code=1 or code='1' means approved, anything else means declined/failed
-    const isCodeApproved = code === '1' || code === 1;
-    const isStatusApproved = ['aprobada', 'approved', 'success', 'paid', 'completed'].includes(status);
-    const isSuccess = isCodeApproved || (isStatusApproved && code === undefined);
-
     if (isSuccess) {
-      // Mark as processed
       order.processed = true;
       order.paymentStatus = 'completed';
       order.paymentId = transactionId;
       order.paidAt = new Date().toISOString();
 
-      console.log(`✅ [Webhook] Order ${orderId} marked as paid [${webhookId}]`);
+      console.log(`[Webhook] Order ${orderId} marked as paid [${webhookId}]`);
 
-      // Send email notification to admin
       try {
         await sendOrderEmail(order);
-        console.log(`📧 [Webhook] Email sent for order ${orderId} [${webhookId}]`);
+        console.log(`[Webhook] Email sent for order ${orderId} [${webhookId}]`);
       } catch (emailError) {
-        console.error(`❌ [Webhook] Failed to send email for order ${orderId}:`, emailError);
+        console.error(`[Webhook] Failed to send email for order ${orderId}:`, emailError);
       }
 
-      // Send order to Betsy CRM (wait for it to complete)
       try {
         await sendOrderToBetsyWithRetry({
           ...order,
           paymentMethod: 'Tilopay',
-          transactionId: transactionId
+          transactionId
         });
-        console.log(`✅ [Webhook] Order synced to Betsy CRM: ${orderId}`);
+        console.log(`[Webhook] Order synced to Betsy CRM: ${orderId}`);
       } catch (error) {
-        console.error(`❌ [Webhook] Failed to sync order to Betsy CRM:`, error);
-        // Don't fail the webhook if Betsy sync fails - just log it
+        console.error('[Webhook] Failed to sync order to Betsy CRM:', error);
       }
 
-      // Fire Meta CAPI Purchase event (backup path, same event_id for dedup)
       const appUrl = (process.env.APP_URL || 'https://deepsleep.shopping').replace(/\/+$/, '');
       const metaEventId = generateEventId('purchase', orderId, transactionId);
       const quantity = parseInt(order.cantidad, 10) || 1;
@@ -156,46 +189,37 @@ export default async function handler(req, res) {
         message: 'Payment confirmed and order created',
         webhookId
       });
-
-    } else {
-      // Payment failed or declined
-      // Check if code indicates failure, or status indicates failure
-      const isCodeDeclined = code !== undefined && code !== '1' && code !== 1;
-      const isStatusDeclined = ['rechazada', 'declined', 'failed', 'canceled', 'cancelled', 'rejected'].includes(status);
-      
-      if (isCodeDeclined || isStatusDeclined) {
-        // Payment failed
-        order.processed = true;
-        order.paymentStatus = 'failed';
-        order.paymentId = transactionId;
-
-        console.log(`❌ [Webhook] Payment failed for order ${orderId} - Code: ${code}, Status: ${status} [${webhookId}]`);
-
-        return res.json({
-          success: true,
-          orderId,
-          message: 'Payment failed - order cancelled',
-          paymentStatus: 'failed',
-          code: code,
-          status: status,
-          webhookId
-        });
-      } else {
-        // Unknown status - log it but don't mark as successful
-        console.warn(`⚠️ [Webhook] Unknown payment status for order ${orderId} - Code: ${code}, Status: ${status} [${webhookId}]`);
-        return res.json({
-          success: true,
-          orderId,
-          message: 'Webhook received but status unknown - payment not confirmed',
-          code: code,
-          status: status,
-          webhookId
-        });
-      }
     }
 
+    if (isCodeDeclined || isStatusDeclined) {
+      order.processed = true;
+      order.paymentStatus = 'failed';
+      order.paymentId = transactionId;
+
+      console.log(`[Webhook] Payment failed for order ${orderId} - Code: ${code}, Status: ${status} [${webhookId}]`);
+
+      return res.json({
+        success: true,
+        orderId,
+        message: 'Payment failed - order cancelled',
+        paymentStatus: 'failed',
+        code,
+        status,
+        webhookId
+      });
+    }
+
+    console.warn(`[Webhook] Unknown payment status for order ${orderId} - Code: ${code}, Status: ${status} [${webhookId}]`);
+    return res.json({
+      success: true,
+      orderId,
+      message: 'Webhook received but status unknown - payment not confirmed',
+      code,
+      status,
+      webhookId
+    });
   } catch (error) {
-    console.error(`❌ [Webhook] Error [${webhookId}]:`, error);
+    console.error(`[Webhook] Error [${webhookId}]:`, error);
     return res.status(500).json({
       error: 'Webhook processing failed',
       message: error.message,

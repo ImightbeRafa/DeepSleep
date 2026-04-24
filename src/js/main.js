@@ -193,6 +193,15 @@ async function handleTilopayPayment(data) {
         const result = await response.json();
         
         showLoading(false);
+
+        if (result.orderId && result.returnData) {
+            try {
+                sessionStorage.setItem(`deepsleep_returnData_${result.orderId}`, result.returnData);
+                sessionStorage.setItem('deepsleep_latestOrderId', result.orderId);
+            } catch (e) {
+                console.warn('Could not persist order return data for success-page fallback:', e);
+            }
+        }
         
         // InitiateCheckout for Tarjeta — with server dedup eventID
         if (result.paymentUrl) {

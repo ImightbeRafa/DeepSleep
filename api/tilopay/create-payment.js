@@ -1,5 +1,5 @@
-import { sendOrderEmail } from '../utils/email.js';
 import { sendMetaEvent, generateEventId } from '../utils/meta.js';
+import { encodeOrderReturnData } from '../utils/orderReturnData.js';
 
 /**
  * Authenticate with Tilopay API
@@ -105,40 +105,6 @@ export default async function handler(req, res) {
       global.pendingOrders = {};
     }
     
-    global.pendingOrders[orderId] = {
-      orderId,
-      nombre,
-      telefono,
-      email,
-      provincia,
-      canton,
-      distrito,
-      direccion,
-      cantidad: quantity,
-      subtotal,
-      shippingCost,
-      total,
-      comentarios,
-      createdAt: new Date().toISOString()
-    };
-
-    // Authenticate with Tilopay
-    console.log('🔑 [Tilopay] Authenticating...');
-    const accessToken = await authenticateTilopay();
-    console.log('✅ [Tilopay] Authentication successful');
-
-    // Create payment link using /processPayment endpoint
-    const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
-    const apiKey = process.env.TILOPAY_API_KEY;
-    const appUrl = process.env.APP_URL || 'https://serverservidorescerbero.com';
-
-    // Split name into first and last name
-    const nameParts = nombre.split(' ');
-    const firstName = nameParts[0] || nombre;
-    const lastName = nameParts.slice(1).join(' ') || nombre;
-
-    // Encode order data to pass through Tilopay redirect
-    // Include all fields needed for email and Betsy CRM
     const orderData = {
       orderId,
       nombre,
@@ -155,13 +121,34 @@ export default async function handler(req, res) {
       comentarios,
       createdAt: new Date().toISOString()
     };
-    const encodedOrderData = Buffer.from(JSON.stringify(orderData)).toString('base64');
+
+    global.pendingOrders[orderId] = orderData;
+
+    // Authenticate with Tilopay
+    console.log('🔑 [Tilopay] Authenticating...');
+    const accessToken = await authenticateTilopay();
+    console.log('✅ [Tilopay] Authentication successful');
+
+    // Create payment link using /processPayment endpoint
+    const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
+    const apiKey = process.env.TILOPAY_API_KEY;
+    const appUrl = process.env.APP_URL || 'https://serverservidorescerbero.com';
+
+    // Split name into first and last name
+    const nameParts = nombre.split(' ');
+    const firstName = nameParts[0] || nombre;
+    const lastName = nameParts.slice(1).join(' ') || nombre;
+
+    // Include encrypted order data in both Tilopay returnData and our redirect URL.
+    // This avoids relying on serverless memory after the customer leaves for Tilopay.
+    const encodedOrderData = encodeOrderReturnData(orderData);
+    const redirectUrl = `${appUrl}/success.html?orderId=${encodeURIComponent(orderId)}&returnData=${encodeURIComponent(encodedOrderData)}`;
 
     const paymentPayload = {
       key: apiKey,
       amount: Math.round(total),
       currency: 'CRC',
-      redirect: `${appUrl}/success.html`,
+      redirect: redirectUrl,
       hashVersion: 'V2',
       billToFirstName: firstName,
       billToLastName: lastName,
@@ -226,6 +213,7 @@ export default async function handler(req, res) {
       success: true,
       orderId,
       metaEventId,
+      returnData: encodedOrderData,
       paymentUrl: paymentUrl,
       transactionId: paymentData.id || paymentData.transaction_id
     });

@@ -208,6 +208,42 @@
             var returnData = urlParams.get('returnData');
             var description = urlParams.get('description') || urlParams.get('mensaje');
 
+            function decodeBase64Url(value) {
+                var normalized = String(value || '').replace(/-/g, '+').replace(/_/g, '/');
+                while (normalized.length % 4) normalized += '=';
+                return atob(normalized);
+            }
+
+            function decodeReturnData(value) {
+                var parsed = JSON.parse(decodeBase64Url(value));
+                if (parsed && parsed.summary) {
+                    return parsed.summary;
+                }
+                if (parsed && parsed.payload) {
+                    return JSON.parse(decodeBase64Url(parsed.payload));
+                }
+                return parsed;
+            }
+
+            var storedOrderId = orderId || sessionStorage.getItem('deepsleep_latestOrderId');
+            if (!returnData && storedOrderId) {
+                returnData = sessionStorage.getItem('deepsleep_returnData_' + storedOrderId);
+            }
+
+            if (!orderId && returnData) {
+                try {
+                    var decodedOrderForId = decodeReturnData(returnData);
+                    orderId = decodedOrderForId && decodedOrderForId.orderId;
+                } catch (e) {}
+            }
+
+            if (orderId && returnData) {
+                try {
+                    sessionStorage.setItem('deepsleep_returnData_' + orderId, returnData);
+                    sessionStorage.setItem('deepsleep_latestOrderId', orderId);
+                } catch (e) {}
+            }
+
             console.log('🔍 [Success Page] URL Parameters:', {
                 orderId: orderId,
                 transactionId: transactionId,
@@ -232,8 +268,8 @@
                 return;
             }
 
-            // ── GATE 2: returnData must be present to confirm the order ──
-            if (!returnData) {
+            // ── GATE 2: returnData is preferred; orderId lets the server try its fallback ──
+            if (!returnData && !orderId) {
                 console.error('❌ [Success Page] No returnData — cannot verify order. Redirecting.');
                 var errorParams2 = new URLSearchParams({
                     orderId: orderId || '',
@@ -242,6 +278,10 @@
                 });
                 window.location.replace('/error.html?' + errorParams2.toString());
                 return;
+            }
+
+            if (!returnData) {
+                console.warn('⚠️ [Success Page] No returnData. Confirming with orderId fallback only.');
             }
 
             console.log('✅ [Success Page] Payment code APPROVED. Verifying with server...');
@@ -264,8 +304,7 @@
                 if (sessionStorage.getItem(purchaseStorageKey)) return;
                 if (!returnData) return;
                 try {
-                    var decoded = atob(returnData);
-                    var order = JSON.parse(decoded);
+                    var order = decodeReturnData(returnData);
                     if (!order || !order.total) return;
                     var quantity = parseInt(order.cantidad, 10) || 1;
                     metaTrack('Purchase', {
