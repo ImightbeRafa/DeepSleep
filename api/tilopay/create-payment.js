@@ -132,17 +132,17 @@ export default async function handler(req, res) {
     // Create payment link using /processPayment endpoint
     const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
     const apiKey = process.env.TILOPAY_API_KEY;
-    const appUrl = process.env.APP_URL || 'https://serverservidorescerbero.com';
+    const appUrl = (process.env.APP_URL || 'https://deepsleep.shopping').replace(/\/+$/, '');
 
     // Split name into first and last name
     const nameParts = nombre.split(' ');
     const firstName = nameParts[0] || nombre;
     const lastName = nameParts.slice(1).join(' ') || nombre;
 
-    // Include encrypted order data in both Tilopay returnData and our redirect URL.
-    // This avoids relying on serverless memory after the customer leaves for Tilopay.
+    // Keep Tilopay's redirect URL short. Tilopay rejects redirect values over
+    // 800 characters, so the encrypted order payload must stay in returnData.
     const encodedOrderData = encodeOrderReturnData(orderData);
-    const redirectUrl = `${appUrl}/success.html?orderId=${encodeURIComponent(orderId)}&returnData=${encodeURIComponent(encodedOrderData)}`;
+    const redirectUrl = `${appUrl}/success.html?orderId=${encodeURIComponent(orderId)}`;
 
     const paymentPayload = {
       key: apiKey,
@@ -168,7 +168,15 @@ export default async function handler(req, res) {
     };
 
     console.log('📤 [Tilopay] Sending payment request to:', `${baseUrl}/processPayment`);
-    console.log('📦 [Tilopay] Payload:', JSON.stringify(paymentPayload, null, 2));
+    console.log('📦 [Tilopay] Payload summary:', JSON.stringify({
+      orderNumber: paymentPayload.orderNumber,
+      amount: paymentPayload.amount,
+      currency: paymentPayload.currency,
+      redirect: paymentPayload.redirect,
+      redirectLength: paymentPayload.redirect.length,
+      hasReturnData: !!paymentPayload.returnData,
+      returnDataLength: paymentPayload.returnData.length
+    }, null, 2));
 
     const captureResponse = await fetch(`${baseUrl}/processPayment`, {
       method: 'POST',
