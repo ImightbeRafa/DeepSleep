@@ -1,12 +1,15 @@
-import { sendOrderEmail } from '../utils/email.js';
-import { sendOrderToBetsyWithRetry } from '../utils/betsy.js';
-import { sendMetaEvent, generateEventId } from '../utils/meta.js';
 import { decodeOrderReturnData } from '../utils/orderReturnData.js';
+import { normalizeTrustedOrder } from '../utils/order.js';
+import { processPaidOrder, sendApprovedManualReviewAlert } from '../utils/fulfillment.js';
 
-/**
- * Confirm payment and send emails, then sync order to Betsy CRM.
- * Called from success page after Tilopay redirects the customer back.
- */
+function getStoredOrder(orderId) {
+  if (!orderId || !global.pendingOrders) {
+    return null;
+  }
+
+  return global.pendingOrders[orderId] || null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,18 +25,27 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  console.log('[Confirm] Payment confirmation request');
-
   try {
-    const { orderId: requestedOrderId, transactionId, code, returnData } = req.body;
+    const { orderId: requestedOrderId, transactionId, code, returnData } = req.body || {};
+    const isPaymentApproved = code === '1' || code === 1;
 
-    console.log(`[Confirm] Order: ${requestedOrderId || 'unknown'}, Transaction: ${transactionId}, Code: ${code}`);
+    console.log(`[Confirm] Order: ${requestedOrderId || 'unknown'}, Transaction: ${transactionId || 'unknown'}, Code: ${code}`);
 
-    let order;
+    if (!isPaymentApproved) {
+      return res.status(400).json({
+        success: false,
+        status: 'declined',
+        error: 'Payment declined',
+        message: 'Payment was not approved',
+        code
+      });
+    }
+
+    let order = null;
+
     if (returnData) {
       try {
         order = decodeOrderReturnData(returnData);
-        console.log('[Confirm] Order data decoded from returnData');
       } catch (decodeError) {
         console.error('[Confirm] Failed to decode returnData:', decodeError);
         return res.status(400).json({
@@ -41,101 +53,58 @@ export default async function handler(req, res) {
           message: 'Could not decode order information'
         });
       }
-    } else if (requestedOrderId && global.pendingOrders && global.pendingOrders[requestedOrderId]) {
-      order = global.pendingOrders[requestedOrderId];
-      console.log('[Confirm] Order data recovered from pendingOrders');
-    } else {
-      console.error('[Confirm] No returnData provided');
-      return res.status(400).json({
-        error: 'Missing order data',
-        message: 'Order information not found in request'
+    }
+
+    if (!order && requestedOrderId) {
+      order = getStoredOrder(requestedOrderId);
+    }
+
+    if (!order) {
+      const manualReview = await sendApprovedManualReviewAlert({
+        orderId: requestedOrderId,
+        transactionId,
+        source: 'redirect',
+        reason: 'Approved redirect did not include usable returnData or pending order data',
+        rawPayload: req.body
+      });
+
+      return res.status(202).json({
+        success: true,
+        status: manualReview.status,
+        manualReview: true,
+        orderId: requestedOrderId,
+        message: 'Payment approved, but the order needs manual review'
       });
     }
 
-    const orderId = order?.orderId || requestedOrderId;
+    const normalizedOrder = normalizeTrustedOrder(order);
+    const orderId = normalizedOrder.orderId || requestedOrderId;
 
-    if (!orderId) {
-      return res.status(400).json({ error: 'Order ID required' });
-    }
-
-    if (requestedOrderId && order.orderId && String(order.orderId) !== String(requestedOrderId)) {
-      console.error(`[Confirm] returnData order mismatch. Request: ${requestedOrderId}, returnData: ${order.orderId}`);
+    if (requestedOrderId && orderId && String(orderId) !== String(requestedOrderId)) {
+      console.error(`[Confirm] returnData order mismatch. Request: ${requestedOrderId}, returnData: ${orderId}`);
       return res.status(400).json({
         error: 'Order mismatch',
         message: 'Order information did not match the payment response'
       });
     }
 
-    if (global.pendingOrders?.[orderId]?.processed) {
-      console.log(`[Confirm] Order already processed: ${orderId}`);
-      return res.json({
-        success: true,
-        alreadyProcessed: true,
-        message: 'Order already processed',
-        orderId
-      });
-    }
-
-    const isPaymentApproved = code === '1' || code === 1;
-
-    if (!isPaymentApproved) {
-      console.log(`[Confirm] Payment declined for order ${orderId}, code: ${code}`);
-      return res.status(400).json({
-        success: false,
-        error: 'Payment declined',
-        message: 'Payment was not approved',
-        code
-      });
-    }
-
-    order.paymentStatus = 'completed';
-    order.paymentId = transactionId;
-    order.paymentMethod = 'Tilopay';
-    order.paidAt = new Date().toISOString();
-
-    if (!global.pendingOrders) {
-      global.pendingOrders = {};
-    }
-    global.pendingOrders[orderId] = {
-      ...order,
-      processed: true
-    };
-
-    console.log(`[Confirm] Order ${orderId} confirmed as paid`);
-
-    try {
-      await sendOrderEmail(order);
-      console.log(`[Confirm] Emails sent for order ${orderId}`);
-    } catch (emailError) {
-      console.error(`[Confirm] Failed to send emails for order ${orderId}:`, emailError);
-    }
-
-    try {
-      await sendOrderToBetsyWithRetry({
-        ...order,
-        paymentMethod: 'Tilopay',
-        transactionId
-      });
-      console.log(`[Confirm] Order synced to Betsy CRM: ${orderId}`);
-    } catch (betsyError) {
-      console.error(`[Confirm] Failed to sync order ${orderId} to Betsy CRM:`, betsyError);
-    }
-
-    const appUrl = (process.env.APP_URL || 'https://deepsleep.shopping').replace(/\/+$/, '');
-    const metaEventId = generateEventId('purchase', orderId, transactionId);
-    const quantity = parseInt(order.cantidad, 10) || 1;
-    sendMetaEvent('Purchase', metaEventId, order, req, {
-      value: order.total || 0,
-      currency: 'CRC',
-      content_ids: ['deepsleep-bucal'],
-      content_type: 'product',
-      num_items: quantity
-    }, `${appUrl}/success.html`).catch(() => {});
+    const fulfillment = await processPaidOrder(normalizedOrder, {
+      req,
+      source: 'redirect',
+      transactionId,
+      rawPayload: req.body
+    });
 
     return res.json({
       success: true,
-      message: 'Payment confirmed, emails sent, and order synced to CRM',
-      orderId
+      message: fulfillment.manualReview
+        ? 'Payment approved and sent to manual review'
+        : 'Payment confirmed and order processed',
+      orderId,
+      status: fulfillment.status,
+      manualReview: fulfillment.manualReview,
+      alreadyProcessed: fulfillment.alreadyProcessed,
+      channelResults: fulfillment.channelResults
     });
   } catch (error) {
     console.error('[Confirm] Error:', error);

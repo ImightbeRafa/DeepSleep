@@ -1,15 +1,14 @@
 import { sendMetaEvent, generateEventId } from '../utils/meta.js';
 import { encodeOrderReturnData } from '../utils/orderReturnData.js';
+import { generateOrderId, normalizeTrustedOrder } from '../utils/order.js';
+import { createPendingAuditTrail } from '../utils/fulfillment.js';
 
-/**
- * Authenticate with Tilopay API
- */
 async function authenticateTilopay() {
   const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
   const apiUser = process.env.TILOPAY_USER;
   const apiPassword = process.env.TILOPAY_PASSWORD;
 
-  console.log('🔍 [Tilopay Auth] Checking credentials...', {
+  console.log('[Tilopay Auth] Checking credentials...', {
     hasUser: !!apiUser,
     hasPassword: !!apiPassword,
     baseUrl
@@ -18,8 +17,6 @@ async function authenticateTilopay() {
   if (!apiUser || !apiPassword) {
     throw new Error('Tilopay credentials not configured in environment variables');
   }
-
-  console.log('🔍 [Tilopay Auth] Sending login request...');
 
   const loginResponse = await fetch(`${baseUrl}/login`, {
     method: 'POST',
@@ -32,25 +29,24 @@ async function authenticateTilopay() {
 
   if (!loginResponse.ok) {
     const errorText = await loginResponse.text();
-    console.error('❌ [Tilopay Auth] Login failed:', errorText);
+    console.error('[Tilopay Auth] Login failed:', errorText);
     throw new Error(`Failed to authenticate with Tilopay: ${loginResponse.status} ${errorText}`);
   }
 
   const loginData = await loginResponse.json();
-  console.log('✅ [Tilopay Auth] Token received');
-  
+
   if (!loginData.access_token) {
     throw new Error('No access token in Tilopay response');
   }
-  
+
   return loginData.access_token;
 }
 
-/**
- * Vercel Serverless Function
- */
+function provinceCode(provincia) {
+  return provincia === 'San Jose' || provincia === 'San Jos\u00e9' ? 'SJ' : 'OT';
+}
+
 export default async function handler(req, res) {
-  // Enable CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -65,7 +61,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  console.log('🔵 [Tilopay] Creating payment link...');
+  console.log('[Tilopay] Creating payment link...');
 
   try {
     const {
@@ -78,35 +74,16 @@ export default async function handler(req, res) {
       direccion,
       cantidad,
       comentarios
-    } = req.body;
+    } = req.body || {};
 
-    // Validation
     if (!nombre || !telefono || !email || !provincia || !canton || !distrito || !direccion || !cantidad) {
       return res.status(400).json({
         error: 'Missing required fields'
       });
     }
 
-    // Calculate total - flat pricing, no volume discount
-    const UNIT_PRICE = 9900; // ₡9,900 per unit
-    const quantity = parseInt(cantidad) || 1;
-    const subtotal = UNIT_PRICE * quantity;
-    
-    // Shipping: ₡3,000 for 1 unit, FREE for 2+
-    const shippingCost = quantity >= 2 ? 0 : 3000;
-    const total = subtotal + shippingCost;
-
-    // Generate simple order ID (6-digit number)
-    const orderId = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Store order data in Vercel KV or use a global object for now
-    // For production, use Vercel KV, Redis, or a database
-    if (!global.pendingOrders) {
-      global.pendingOrders = {};
-    }
-    
-    const orderData = {
-      orderId,
+    const orderData = normalizeTrustedOrder({
+      orderId: generateOrderId(),
       nombre,
       telefono,
       email,
@@ -114,65 +91,72 @@ export default async function handler(req, res) {
       canton,
       distrito,
       direccion,
-      cantidad: quantity,
-      subtotal,
-      shippingCost,
-      total,
+      cantidad,
       comentarios,
+      paymentStatus: 'pending',
+      paymentMethod: 'Tilopay',
       createdAt: new Date().toISOString()
-    };
+    });
 
-    global.pendingOrders[orderId] = orderData;
-
-    // Authenticate with Tilopay
-    console.log('🔑 [Tilopay] Authenticating...');
     const accessToken = await authenticateTilopay();
-    console.log('✅ [Tilopay] Authentication successful');
-
-    // Create payment link using /processPayment endpoint
     const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
     const apiKey = process.env.TILOPAY_API_KEY;
     const appUrl = (process.env.APP_URL || 'https://deepsleep.shopping').replace(/\/+$/, '');
 
-    // Split name into first and last name
-    const nameParts = nombre.split(' ');
+    if (!apiKey) {
+      throw new Error('Tilopay API key not configured in environment variables');
+    }
+
+    const nameParts = String(nombre).trim().split(/\s+/);
     const firstName = nameParts[0] || nombre;
     const lastName = nameParts.slice(1).join(' ') || nombre;
-
-    // Keep Tilopay's redirect URL short. Tilopay rejects redirect values over
-    // 800 characters, so the encrypted order payload must stay in returnData.
     const encodedOrderData = encodeOrderReturnData(orderData);
-    const redirectUrl = `${appUrl}/success.html?orderId=${encodeURIComponent(orderId)}`;
+    const redirectUrl = `${appUrl}/success.html?orderId=${encodeURIComponent(orderData.orderId)}`;
+    const webhookUrl = `${appUrl}/api/tilopay/webhook`;
+    const address2 = `${distrito}, ${canton}`;
+    const state = `CR-${provinceCode(provincia)}`;
 
     const paymentPayload = {
       key: apiKey,
-      amount: Math.round(total),
+      amount: Math.round(orderData.total),
       currency: 'CRC',
       redirect: redirectUrl,
+      notification_url: webhookUrl,
       hashVersion: 'V2',
+      token_version: 'v2',
       billToFirstName: firstName,
       billToLastName: lastName,
       billToAddress: direccion,
-      billToAddress2: `${distrito}, ${canton}`,
+      billToAddress2: address2,
       billToCity: canton,
-      billToState: 'CR-' + (provincia === 'San José' ? 'SJ' : 'OT'),
+      billToState: state,
       billToZipPostCode: '10101',
       billToCountry: 'CR',
       billToTelephone: telefono,
       billToEmail: email,
-      orderNumber: orderId,
+      shipToFirstName: firstName,
+      shipToLastName: lastName,
+      shipToAddress: direccion,
+      shipToAddress2: address2,
+      shipToCity: canton,
+      shipToState: state,
+      shipToZipPostCode: '10101',
+      shipToCountry: 'CR',
+      shipToTelephone: telefono,
+      shipToEmail: email,
+      orderNumber: orderData.orderId,
       capture: '1',
       subscription: '0',
       platform: 'DeepSleep',
       returnData: encodedOrderData
     };
 
-    console.log('📤 [Tilopay] Sending payment request to:', `${baseUrl}/processPayment`);
-    console.log('📦 [Tilopay] Payload summary:', JSON.stringify({
+    console.log('[Tilopay] Payload summary:', JSON.stringify({
       orderNumber: paymentPayload.orderNumber,
       amount: paymentPayload.amount,
       currency: paymentPayload.currency,
       redirect: paymentPayload.redirect,
+      notification_url: paymentPayload.notification_url,
       redirectLength: paymentPayload.redirect.length,
       hasReturnData: !!paymentPayload.returnData,
       returnDataLength: paymentPayload.returnData.length
@@ -187,48 +171,52 @@ export default async function handler(req, res) {
       body: JSON.stringify(paymentPayload)
     });
 
-    console.log('📥 [Tilopay] Response status:', captureResponse.status);
-
     if (!captureResponse.ok) {
       const errorText = await captureResponse.text();
-      console.error('❌ [Tilopay] Payment error:', errorText);
+      console.error('[Tilopay] Payment error:', errorText);
       throw new Error(`Failed to create payment link: ${captureResponse.status} - ${errorText}`);
     }
 
     const paymentData = await captureResponse.json();
-
-    console.log('✅ Payment link created:', paymentData);
-
-    // Extract payment URL from response
     const paymentUrl = paymentData.urlPaymentForm || paymentData.url || paymentData.payment_url;
 
     if (!paymentUrl) {
-      console.error('❌ [Tilopay] No payment URL in response:', paymentData);
+      console.error('[Tilopay] No payment URL in response:', paymentData);
       throw new Error('No payment URL received from Tilopay');
     }
 
-    // Fire Meta CAPI InitiateCheckout event (server-side, deduped with browser)
-    const metaEventId = generateEventId('ic', orderId);
+    const pendingAuditTrail = await createPendingAuditTrail(orderData, {
+      source: 'create-payment',
+      rawPayload: {
+        tilopayResponse: paymentData
+      }
+    });
+
+    if (!pendingAuditTrail.success && process.env.ALLOW_UNAUDITED_CHECKOUT !== 'true') {
+      console.error('[Tilopay] Pending audit trail failed. Payment URL will not be released.', pendingAuditTrail);
+      throw new Error('Unable to create order audit trail before payment');
+    }
+
+    const metaEventId = generateEventId('ic', orderData.orderId);
     sendMetaEvent('InitiateCheckout', metaEventId, orderData, req, {
-      value: total,
+      value: orderData.total,
       currency: 'CRC',
       content_ids: ['deepsleep-bucal'],
       content_type: 'product',
-      num_items: quantity
+      num_items: orderData.cantidad
     }, `${appUrl}/#pedido`).catch(() => {});
 
     return res.json({
       success: true,
-      orderId,
+      orderId: orderData.orderId,
       metaEventId,
       returnData: encodedOrderData,
-      paymentUrl: paymentUrl,
+      paymentUrl,
+      auditTrail: pendingAuditTrail,
       transactionId: paymentData.id || paymentData.transaction_id
     });
-
   } catch (error) {
-    console.error('❌ [Tilopay] Create payment error:', error);
-    console.error('❌ [Tilopay] Error stack:', error.stack);
+    console.error('[Tilopay] Create payment error:', error);
     return res.status(500).json({
       error: 'Failed to create payment',
       message: error.message,
