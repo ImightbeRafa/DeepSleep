@@ -61,8 +61,8 @@ export async function createPaymentLink(req, res) {
     const quantity = parseInt(cantidad) || 1;
     const subtotal = UNIT_PRICE * quantity;
     
-    // Shipping: ₡3,000 for 1 unit, FREE for 2+
-    const shippingCost = quantity >= 2 ? 0 : 3000;
+    // Shipping: ₡3,000 for every order
+    const shippingCost = 3000;
     const total = subtotal + shippingCost;
 
     // Generate unique order ID

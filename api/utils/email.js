@@ -143,7 +143,7 @@ async function sendCustomerEmail(order) {
             <p><span class="label">Producto:</span> ${escapeHtml(order.productName || 'DeepSleep Bucal Anti-Ronquidos')}</p>
             <p><span class="label">Cantidad:</span> ${escapeHtml(order.cantidad)}</p>
             <p><span class="label">Subtotal:</span> ${formatCurrency(order.subtotal)}</p>
-            <p><span class="label">Envio:</span> ${order.shippingCost > 0 ? formatCurrency(order.shippingCost) : 'GRATIS'}</p>
+            <p><span class="label">Envio:</span> ${formatCurrency(order.shippingCost)}</p>
             <p><span class="label">Total:</span> ${formatCurrency(order.total)}</p>
           </div>
           <p>Su pago con tarjeta ha sido procesado exitosamente.</p>
@@ -222,7 +222,7 @@ export async function sendAdminEmail(order, options = {}) {
           <div class="info-item"><span class="label">Cantidad:</span> ${escapeHtml(order.cantidad)}</div>
           <div class="info-item"><span class="label">Precio Unitario:</span> ${formatCurrency(order.unitPrice || 9900)}</div>
           <div class="info-item"><span class="label">Subtotal:</span> ${formatCurrency(order.subtotal)}</div>
-          <div class="info-item"><span class="label">Envio:</span> ${order.shippingCost > 0 ? formatCurrency(order.shippingCost) : 'GRATIS'}</div>
+          <div class="info-item"><span class="label">Envio:</span> ${formatCurrency(order.shippingCost)}</div>
           <div class="info-item total"><span class="label">Total:</span> ${formatCurrency(order.total)}</div>
         </div>
 

@@ -95,6 +95,25 @@ test('trusted totals enforce 9900 + 3000 = 12900', () => {
   assert.equal(order.total, 12900);
 });
 
+test('trusted totals charge shipping on multi-unit orders', () => {
+  resetState();
+  const order = normalizeTrustedOrder({
+    orderId: 'ORD-MULTI-SHIPPING',
+    nombre: 'Ana',
+    telefono: '88888888',
+    email: 'ana@example.com',
+    provincia: 'San Jose',
+    canton: 'Central',
+    distrito: 'Carmen',
+    direccion: 'Calle 1',
+    cantidad: 2
+  });
+
+  assert.equal(order.subtotal, 19800);
+  assert.equal(order.shippingCost, 3000);
+  assert.equal(order.total, 22800);
+});
+
 test('create-payment sends trusted Tilopay payload and creates pending audit trail', async () => {
   resetState();
   const calls = [];

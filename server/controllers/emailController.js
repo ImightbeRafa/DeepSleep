@@ -125,7 +125,7 @@ export async function sendOrderEmail(order) {
             <div class="info-item"><span class="label">Producto:</span> DeepSleep Bucal Anti-Ronquidos</div>
             <div class="info-item"><span class="label">Cantidad:</span> ${order.cantidad}</div>
             <div class="info-item"><span class="label">Precio Unitario:</span> ₡9.900</div>
-            <div class="info-item"><span class="label">Envío:</span> GRATIS</div>
+            <div class="info-item"><span class="label">Envío:</span> ₡${Number(order.shippingCost || 0).toLocaleString('es-CR')}</div>
             <div class="info-item total"><span class="label">Total:</span> ₡${order.total.toLocaleString('es-CR')}</div>
           </div>
 

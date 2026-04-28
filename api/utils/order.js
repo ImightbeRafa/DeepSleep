@@ -25,7 +25,7 @@ export function normalizeQuantity(value) {
 export function calculateTrustedTotals(value) {
   const cantidad = normalizeQuantity(value);
   const subtotal = PRODUCT.unitPrice * cantidad;
-  const shippingCost = cantidad >= 2 ? 0 : SHIPPING_COST;
+  const shippingCost = SHIPPING_COST;
   const total = subtotal + shippingCost;
 
   return {

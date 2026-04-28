@@ -8,7 +8,7 @@ const API_BASE_URL = '/api'; // Vercel serverless functions
 const UNIT_PRICE = 9900; // ₡9,900 per unit, no volume discount
 
 // Shipping costs
-const SHIPPING_COST = 3000; // ₡3,000 for 1 unit, FREE for 2+
+const SHIPPING_COST = 3000; // ₡3,000 for every order
 
 // --- Meta Pixel tracking helpers ---
 function metaTrack(eventName, params, options) {
@@ -30,7 +30,7 @@ function metaTrack(eventName, params, options) {
 function getOrderMetaValue() {
     const quantity = parseInt(document.getElementById('cantidad')?.value) || 1;
     const subtotal = UNIT_PRICE * quantity;
-    const shippingCost = quantity >= 2 ? 0 : SHIPPING_COST;
+    const shippingCost = SHIPPING_COST;
     return subtotal + shippingCost;
 }
 
@@ -106,17 +106,13 @@ function updateTotal() {
     const quantity = parseInt(quantitySelect.value) || 1;
     const subtotal = UNIT_PRICE * quantity;
     
-    // Shipping: ₡3,000 for 1 unit, FREE for 2+
-    const shippingCost = quantity >= 2 ? 0 : SHIPPING_COST;
+    // Shipping: ₡3,000 for every order
+    const shippingCost = SHIPPING_COST;
     const total = subtotal + shippingCost;
     
     // Update quantity and total display
     if (summaryItemElement) {
-        if (quantity === 1) {
-            summaryItemElement.textContent = `₡${subtotal.toLocaleString('es-CR')}`;
-        } else {
-            summaryItemElement.textContent = `${quantity} x ₡${subtotal.toLocaleString('es-CR')}`;
-        }
+        summaryItemElement.textContent = `₡${subtotal.toLocaleString('es-CR')}`;
     }
     
     // Update the existing shipping display (find by looking for span with "Envío" text)
@@ -131,7 +127,7 @@ function updateTotal() {
     
     if (shippingElement) {
         const shippingSpan = shippingElement.querySelector('span:last-child');
-        shippingSpan.textContent = shippingCost === 0 ? 'GRATIS' : `₡${shippingCost.toLocaleString('es-CR')}`;
+        shippingSpan.textContent = `₡${shippingCost.toLocaleString('es-CR')}`;
     }
     
     // No volume discount - hide savings element
