@@ -302,6 +302,7 @@
 
             function trackPurchaseOnce() {
                 if (sessionStorage.getItem(purchaseStorageKey)) return;
+                if (!transactionId) return;
                 if (!returnData) return;
                 try {
                     var order = decodeReturnData(returnData);
@@ -336,9 +337,15 @@
                 if (data.success || data.alreadyProcessed) {
                     // ✅ Server confirmed — reveal success UI
                     document.getElementById('order-number').textContent = orderId || 'Confirmado';
+                    if (data.manualReview) {
+                        document.querySelector('#success-container h1').textContent = 'Pago en revisión';
+                        document.querySelector('#success-container > p').textContent = 'Tilopay reportó el pago como aprobado, pero necesitamos revisar la orden manualmente antes de enviar la confirmación.';
+                    }
                     document.getElementById('verifying-container').style.display = 'none';
                     document.getElementById('success-container').style.display = 'block';
-                    trackPurchaseOnce();
+                    if (!data.manualReview && data.status === 'approved_processed') {
+                        trackPurchaseOnce();
+                    }
                     console.log('✅ [Success Page] Payment verified and confirmed!');
                 } else {
                     // Server rejected the confirmation

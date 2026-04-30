@@ -47,13 +47,19 @@ export async function createPendingAuditTrail(orderInput, options = {}) {
     pendingAuditCreatedAt: new Date().toISOString()
   };
 
-  const [emailResult, betsyResult] = await Promise.allSettled([
-    sendPendingOrderEmail(order),
-    sendOrderToBetsyWithRetry(order, 2)
-  ]);
+  const shouldSendPendingBetsy = process.env.SEND_PENDING_BETSY_ORDERS === 'true';
+  const pendingTasks = [
+    sendPendingOrderEmail(order)
+  ];
+
+  if (shouldSendPendingBetsy) {
+    pendingTasks.push(sendOrderToBetsyWithRetry(order, 2));
+  }
+
+  const [emailResult, betsyResult] = await Promise.allSettled(pendingTasks);
 
   const emailOk = Boolean(channelSucceeded(emailResult));
-  const betsyOk = Boolean(channelSucceeded(betsyResult));
+  const betsyOk = shouldSendPendingBetsy && Boolean(channelSucceeded(betsyResult));
   const success = emailOk || betsyOk;
 
   const auditTrail = {
@@ -62,7 +68,13 @@ export async function createPendingAuditTrail(orderInput, options = {}) {
     source: options.source || 'create-payment',
     channels: {
       adminEmail: summarizeResult(emailResult),
-      betsy: summarizeResult(betsyResult)
+      betsy: shouldSendPendingBetsy
+        ? summarizeResult(betsyResult)
+        : {
+          success: false,
+          skipped: true,
+          reason: 'Pending Betsy orders are disabled until payment approval'
+        }
     }
   };
 
@@ -104,6 +116,29 @@ export async function processPaidOrder(orderInput, options = {}) {
   const processedOrder = global.pendingOrders[order.orderId];
 
   if (processedOrder?.processed && String(processedOrder.fulfillmentStatus || '').startsWith('approved')) {
+    if (processedOrder.fulfillmentKey && processedOrder.fulfillmentKey !== fulfillmentKey) {
+      const manualReviewResult = await sendApprovedManualReviewAlert({
+        orderId: order.orderId,
+        transactionId,
+        source: options.source || 'unknown',
+        reason: `Approved payment arrived for an order already fulfilled with ${processedOrder.fulfillmentKey}`,
+        rawPayload: options.rawPayload,
+        order
+      });
+
+      return {
+        success: true,
+        status: manualReviewResult.status,
+        manualReview: true,
+        orderId: order.orderId,
+        transactionId,
+        duplicateApprovedPayment: true,
+        channelResults: {
+          manualReviewEmail: manualReviewResult.channelResults.manualReviewEmail
+        }
+      };
+    }
+
     return {
       success: true,
       status: processedOrder.fulfillmentStatus,

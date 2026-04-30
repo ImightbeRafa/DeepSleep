@@ -28,6 +28,7 @@ export default async function handler(req, res) {
   try {
     const { orderId: requestedOrderId, transactionId, code, returnData } = req.body || {};
     const isPaymentApproved = code === '1' || code === 1;
+    const hasTransactionId = Boolean(String(transactionId || '').trim());
 
     console.log(`[Confirm] Order: ${requestedOrderId || 'unknown'}, Transaction: ${transactionId || 'unknown'}, Code: ${code}`);
 
@@ -38,6 +39,24 @@ export default async function handler(req, res) {
         error: 'Payment declined',
         message: 'Payment was not approved',
         code
+      });
+    }
+
+    if (!hasTransactionId) {
+      const manualReview = await sendApprovedManualReviewAlert({
+        orderId: requestedOrderId,
+        transactionId,
+        source: 'redirect',
+        reason: 'Approved redirect did not include a Tilopay transaction ID',
+        rawPayload: req.body
+      });
+
+      return res.status(202).json({
+        success: true,
+        status: manualReview.status,
+        manualReview: true,
+        orderId: requestedOrderId,
+        message: 'Payment approval needs manual review because the Tilopay transaction ID was missing'
       });
     }
 

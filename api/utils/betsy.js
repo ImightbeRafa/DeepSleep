@@ -11,6 +11,7 @@
 export async function sendOrderToBetsy(orderData) {
   const apiKey = process.env.BETSY_API_KEY;
   const apiUrl = process.env.BETSY_API_URL;
+  const idempotencyKey = getBetsyIdempotencyKey(orderData);
 
   console.log('🔍 [Betsy] Environment check - API Key exists:', !!apiKey);
   console.log('🔍 [Betsy] Environment check - API URL exists:', !!apiUrl);
@@ -110,6 +111,9 @@ export async function sendOrderToBetsy(orderData) {
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
+          'Idempotency-Key': idempotencyKey,
+          'X-Idempotency-Key': idempotencyKey,
+          'X-Order-Id': String(orderData.orderId || ''),
         },
         body: JSON.stringify(betsyOrder),
         signal: controller.signal,
@@ -130,6 +134,17 @@ export async function sendOrderToBetsy(orderData) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      if (isDuplicateBetsyResponse(response.status, errorText)) {
+        console.warn('Duplicate Betsy order suppressed:', orderData.orderId);
+        return {
+          success: true,
+          duplicate: true,
+          idempotencyKey,
+          status: response.status,
+          data: errorText,
+        };
+      }
+
       console.error('❌ [Betsy] CRM sync failed:', response.status, errorText);
       console.error('❌ [Betsy] Failed order ID:', orderData.orderId);
       console.error('❌ [Betsy] Response headers:', JSON.stringify([...response.headers.entries()]));
@@ -200,6 +215,24 @@ export async function sendOrderToBetsyWithRetry(orderData, maxRetries = 3) {
     console.error(`❌ [Betsy] Failed after ${attempt} attempts:`, result.error);
     return result;
   }
+}
+
+function getBetsyIdempotencyKey(orderData) {
+  const orderRef = orderData?.orderId || orderData?.paymentId || orderData?.transactionId || 'unknown-order';
+  return `deepsleep/betsy-order/${String(orderRef).replace(/[^a-zA-Z0-9._:-]/g, '-')}`.slice(0, 256);
+}
+
+function isDuplicateBetsyResponse(status, body) {
+  if (status !== 409) {
+    return false;
+  }
+
+  const text = String(body || '').toLowerCase();
+  return text.includes('duplicate') ||
+    text.includes('already') ||
+    text.includes('exists') ||
+    text.includes('duplicado') ||
+    text.includes('existe');
 }
 
 /**

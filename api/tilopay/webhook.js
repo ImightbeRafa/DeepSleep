@@ -127,12 +127,22 @@ export default async function handler(req, res) {
     const isVerified = verifyWebhookSignature(req);
 
     if (!isVerified) {
-      console.warn(`[Webhook] Signature not verified, processing with payload controls [${webhookId}]`);
+      if (process.env.ALLOW_UNSIGNED_TILOPAY_WEBHOOKS !== 'true') {
+        console.error(`[Webhook] Signature not verified [${webhookId}]`);
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Tilopay webhook signature was not verified',
+          webhookId
+        });
+      }
+
+      console.warn(`[Webhook] Signature not verified, processing because ALLOW_UNSIGNED_TILOPAY_WEBHOOKS=true [${webhookId}]`);
     }
 
     const orderId = getOrderId(payload);
     const transactionId = getTransactionId(payload);
     const status = classifyPayment(payload);
+    const hasTransactionId = Boolean(String(transactionId || '').trim());
 
     console.log(`[Webhook] Payment details - Order: ${orderId || 'unknown'}, Transaction: ${transactionId || 'unknown'}, Status: ${status} [${webhookId}]`);
 
@@ -162,6 +172,28 @@ export default async function handler(req, res) {
         status: 'declined',
         paymentStatus: 'failed',
         message: 'Payment declined',
+        webhookId
+      });
+    }
+
+    if (!hasTransactionId) {
+      const manualReview = await sendApprovedManualReviewAlert({
+        orderId,
+        transactionId,
+        source: 'webhook',
+        reason: 'Approved webhook did not include a Tilopay transaction ID',
+        rawPayload: {
+          webhookId,
+          payload
+        }
+      });
+
+      return res.status(202).json({
+        success: true,
+        orderId,
+        status: manualReview.status,
+        manualReview: true,
+        message: 'Approved payment sent to manual review because the transaction ID was missing',
         webhookId
       });
     }
