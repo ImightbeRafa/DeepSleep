@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import tilopayRoutes from './routes/tilopay.js';
 import emailRoutes from './routes/email.js';
+import stockStatusHandler from '../api/stock-status.js';
 
 // Load environment variables
 dotenv.config();
@@ -19,6 +20,8 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'DeepSleep API is running' });
 });
+
+app.get('/api/stock-status', stockStatusHandler);
 
 // Routes
 app.use('/api/tilopay', tilopayRoutes);

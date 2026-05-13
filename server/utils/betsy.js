@@ -72,7 +72,8 @@ export async function sendOrderToBetsy(orderData) {
       payment: {
         method: paymentMethod,
         transactionId: transactionId,
-        status: 'PENDIENTE', // Always PENDIENTE - order status, not payment status
+        status: paymentStatus,
+        fulfillmentStatus: 'PENDIENTE',
         date: new Date().toLocaleString('es-CR', {
           timeZone: 'America/Costa_Rica',
           year: 'numeric',

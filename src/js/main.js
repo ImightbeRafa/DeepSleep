@@ -10,6 +10,62 @@ const UNIT_PRICE = 9900; // ₡9,900 per unit, no volume discount
 // Shipping costs
 const SHIPPING_COST = 3000; // ₡3,000 for every order
 
+const DEFAULT_OUT_OF_STOCK_MESSAGE = 'Estamos sin stock por el momento. No estamos recibiendo pedidos nuevos.';
+let productInStock = true;
+let currentOutOfStockMessage = DEFAULT_OUT_OF_STOCK_MESSAGE;
+
+function setProductAvailability(inStock, message = DEFAULT_OUT_OF_STOCK_MESSAGE) {
+    productInStock = inStock;
+    currentOutOfStockMessage = message;
+    document.body.classList.toggle('is-out-of-stock', !inStock);
+
+    const currentOrderForm = document.getElementById('order-form');
+    const submitButton = currentOrderForm?.querySelector('button[type="submit"]');
+    const stockMessage = document.getElementById('stock-message');
+    const ctaButtons = document.querySelectorAll('a[href="#pedido"].btn-primary');
+
+    if (stockMessage) {
+        stockMessage.textContent = message;
+        stockMessage.hidden = inStock;
+    }
+
+    if (submitButton) {
+        submitButton.disabled = !inStock;
+        submitButton.textContent = inStock ? 'Enviar Pedido' : 'Sin stock por el momento';
+    }
+
+    ctaButtons.forEach((button) => {
+        if (!button.dataset.inStockText) {
+            button.dataset.inStockText = button.textContent;
+        }
+
+        button.textContent = inStock ? button.dataset.inStockText : 'Sin stock por el momento';
+        button.classList.toggle('btn-disabled', !inStock);
+        button.setAttribute('aria-disabled', String(!inStock));
+    });
+}
+
+async function refreshStockStatus() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/stock-status`, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            },
+            cache: 'no-store'
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        const status = await response.json();
+        setProductAvailability(status.inStock !== false, status.message || DEFAULT_OUT_OF_STOCK_MESSAGE);
+    } catch (error) {
+        console.warn('Could not load stock status:', error);
+    }
+}
+
 // --- Meta Pixel tracking helpers ---
 function metaTrack(eventName, params, options) {
     try {
@@ -151,6 +207,11 @@ const orderForm = document.getElementById('order-form');
 if (orderForm) {
     orderForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+
+        if (!productInStock) {
+            showMessage(currentOutOfStockMessage, 'error');
+            return;
+        }
         
         // Get form data
         const formData = new FormData(orderForm);
@@ -183,6 +244,12 @@ async function handleTilopayPayment(data) {
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
             console.error('Tilopay API error:', errorData);
+
+            if (errorData.error === 'OUT_OF_STOCK') {
+                setProductAvailability(false, errorData.message || DEFAULT_OUT_OF_STOCK_MESSAGE);
+                throw new Error(errorData.message || DEFAULT_OUT_OF_STOCK_MESSAGE);
+            }
+
             throw new Error(errorData.message || 'Failed to create payment link');
         }
         
@@ -262,6 +329,7 @@ function showLoading(show) {
 // Initialize total on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateTotal();
+    refreshStockStatus();
 });
 
 // --- Sticky CTA bar show/hide ---

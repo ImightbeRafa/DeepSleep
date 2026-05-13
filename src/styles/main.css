@@ -789,8 +789,37 @@ section {
     border-top: 2px solid var(--color-primary);
 }
 
+.stock-message {
+    align-self: start;
+    grid-column: 2;
+    background-color: #fff3cd;
+    color: #664d03;
+    border: 1px solid #ffecb5;
+    border-radius: var(--border-radius);
+    padding: var(--spacing-sm);
+    font-weight: 600;
+    text-align: center;
+}
+
+.btn-disabled,
+.btn-disabled:hover {
+    background-color: var(--color-dark-grey);
+    color: var(--color-white);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: var(--shadow);
+}
+
+.btn-submit:disabled {
+    background-color: var(--color-dark-grey);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: var(--shadow);
+}
+
 /* Form Styles */
 .order-form {
+    grid-column: 2;
     background-color: var(--color-light-grey);
     padding: var(--spacing-md);
     border-radius: var(--border-radius);
@@ -992,6 +1021,14 @@ section {
 
     .order-container {
         grid-template-columns: 1fr;
+    }
+
+    .order-form {
+        grid-column: 1;
+    }
+
+    .stock-message {
+        grid-column: 1;
     }
 
     .contact-buttons {

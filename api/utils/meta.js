@@ -4,6 +4,11 @@ const PIXEL_ID = process.env.META_PIXEL_ID || '1710686599976070';
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}/${PIXEL_ID}/events`;
 
+function getMetaTimeoutMs() {
+  const configured = Number.parseInt(process.env.META_TIMEOUT_MS || '', 10);
+  return Number.isInteger(configured) && configured > 0 ? configured : 3000;
+}
+
 /**
  * SHA-256 hash after normalizing — Meta requires all PII to be hashed
  */
@@ -70,6 +75,9 @@ export async function sendMetaEvent(eventName, eventId, order, req, customData, 
   }
 
   try {
+    const timeoutMs = getMetaTimeoutMs();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     const eventData = {
       event_name: eventName,
       event_time: Math.floor(Date.now() / 1000),
@@ -83,11 +91,24 @@ export async function sendMetaEvent(eventName, eventId, order, req, customData, 
       eventData.custom_data = customData;
     }
 
-    const response = await fetch(GRAPH_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: [eventData], access_token: accessToken }),
-    });
+    let response;
+
+    try {
+      response = await fetch(GRAPH_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: [eventData], access_token: accessToken }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        return { success: false, error: `${eventName} timed out after ${timeoutMs}ms` };
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const result = await response.json();
     if (!response.ok) {

@@ -42,6 +42,11 @@ function getNotificationConfig() {
   };
 }
 
+function getEmailTimeoutMs() {
+  const configured = Number.parseInt(process.env.EMAIL_TIMEOUT_MS || '', 10);
+  return Number.isInteger(configured) && configured > 0 ? configured : 5000;
+}
+
 async function parseResendError(response) {
   const body = await response.text();
 
@@ -79,16 +84,32 @@ async function sendResendEmail({ resendApiKey, idempotencyKey, payload }) {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${resendApiKey}`
   };
+  const timeoutMs = getEmailTimeoutMs();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   if (idempotencyKey) {
     headers['Idempotency-Key'] = idempotencyKey;
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload)
-  });
+  let response;
+
+  try {
+    response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Email request timed out after ${timeoutMs}ms`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     const { body, data } = await parseResendError(response);

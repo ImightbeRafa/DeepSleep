@@ -32,6 +32,42 @@ function summarizeResult(result) {
   };
 }
 
+function getPositiveIntegerEnv(name, fallback) {
+  const value = Number.parseInt(process.env[name] || '', 10);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function getFulfillmentChannelTimeoutMs() {
+  return getPositiveIntegerEnv('FULFILLMENT_CHANNEL_TIMEOUT_MS', 6000);
+}
+
+function getPendingAuditTimeoutMs() {
+  return getPositiveIntegerEnv('PENDING_AUDIT_TIMEOUT_MS', 1500);
+}
+
+function getPaidBetsyRetryCount() {
+  return getPositiveIntegerEnv('BETSY_FULFILLMENT_RETRIES', 1);
+}
+
+function skippedChannel(reason) {
+  return {
+    success: false,
+    skipped: true,
+    reason
+  };
+}
+
+function withTimeout(promise, timeoutMs, label) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
 export async function createPendingAuditTrail(orderInput, options = {}) {
   ensureOrderStores();
 
@@ -47,35 +83,39 @@ export async function createPendingAuditTrail(orderInput, options = {}) {
     pendingAuditCreatedAt: new Date().toISOString()
   };
 
+  const shouldSendPendingEmail = process.env.SEND_PENDING_ADMIN_EMAILS === 'true';
   const shouldSendPendingBetsy = process.env.SEND_PENDING_BETSY_ORDERS === 'true';
-  const pendingTasks = [
-    sendPendingOrderEmail(order)
-  ];
+  const pendingTasks = [];
 
-  if (shouldSendPendingBetsy) {
-    pendingTasks.push(sendOrderToBetsyWithRetry(order, 2));
+  if (shouldSendPendingEmail) {
+    pendingTasks.push(['adminEmail', sendPendingOrderEmail(order)]);
   }
 
-  const [emailResult, betsyResult] = await Promise.allSettled(pendingTasks);
+  if (shouldSendPendingBetsy) {
+    pendingTasks.push(['betsy', sendOrderToBetsyWithRetry(order, 2)]);
+  }
 
-  const emailOk = Boolean(channelSucceeded(emailResult));
-  const betsyOk = shouldSendPendingBetsy && Boolean(channelSucceeded(betsyResult));
-  const success = emailOk || betsyOk;
+  const channels = {
+    adminEmail: skippedChannel('Pending admin emails are disabled until SEND_PENDING_ADMIN_EMAILS=true'),
+    betsy: skippedChannel('Pending Betsy orders are disabled until SEND_PENDING_BETSY_ORDERS=true')
+  };
+
+  if (pendingTasks.length > 0) {
+    const timeoutMs = getPendingAuditTimeoutMs();
+    const results = await Promise.allSettled(
+      pendingTasks.map(([name, task]) => withTimeout(task, timeoutMs, `Pending ${name} audit`))
+    );
+
+    pendingTasks.forEach(([name], index) => {
+      channels[name] = summarizeResult(results[index]);
+    });
+  }
 
   const auditTrail = {
-    success,
-    status: success ? 'pending' : 'pending_audit_failed',
+    success: true,
+    status: 'pending',
     source: options.source || 'create-payment',
-    channels: {
-      adminEmail: summarizeResult(emailResult),
-      betsy: shouldSendPendingBetsy
-        ? summarizeResult(betsyResult)
-        : {
-          success: false,
-          skipped: true,
-          reason: 'Pending Betsy orders are disabled until payment approval'
-        }
-    }
+    channels
   };
 
   global.pendingOrders[order.orderId].pendingAuditTrail = auditTrail;
@@ -165,13 +205,18 @@ export async function processPaidOrder(orderInput, options = {}) {
     processed: false
   };
 
+  const fulfillmentTimeoutMs = getFulfillmentChannelTimeoutMs();
   const [emailResult, betsyResult] = await Promise.allSettled([
-    sendOrderEmail(order),
-    sendOrderToBetsyWithRetry({
-      ...order,
-      paymentMethod: 'Tilopay',
-      transactionId
-    })
+    withTimeout(sendOrderEmail(order), fulfillmentTimeoutMs, 'Paid email fulfillment'),
+    withTimeout(
+      sendOrderToBetsyWithRetry({
+        ...order,
+        paymentMethod: 'Tilopay',
+        transactionId
+      }, getPaidBetsyRetryCount()),
+      fulfillmentTimeoutMs,
+      'Paid Betsy fulfillment'
+    )
   ]);
 
   const emailOk = Boolean(channelSucceeded(emailResult));

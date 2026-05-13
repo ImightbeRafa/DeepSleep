@@ -26,7 +26,9 @@ function resetState() {
     ORDER_NOTIFICATION_EMAIL: 'orders@example.com',
     BETSY_API_KEY: '',
     BETSY_API_URL: '',
-    META_CAPI_ACCESS_TOKEN: ''
+    META_CAPI_ACCESS_TOKEN: '',
+    PRODUCT_IN_STOCK: 'TRUE',
+    OUT_OF_STOCK_MESSAGE: 'No hay stock disponible'
   };
 }
 
@@ -115,7 +117,42 @@ test('trusted totals charge shipping on multi-unit orders', () => {
   assert.equal(order.total, 22800);
 });
 
-test('create-payment sends trusted Tilopay payload and creates pending email audit only', async () => {
+test('create-payment blocks new checkouts when product stock is disabled', async () => {
+  resetState();
+  process.env.PRODUCT_IN_STOCK = 'False';
+  let fetchCalled = false;
+
+  global.fetch = async () => {
+    fetchCalled = true;
+    return Response.json({});
+  };
+
+  const req = {
+    method: 'POST',
+    body: {
+      nombre: 'Ana Cliente',
+      telefono: '88888888',
+      email: 'ana@example.com',
+      provincia: 'San Jose',
+      canton: 'Central',
+      distrito: 'Carmen',
+      direccion: 'Calle 1',
+      cantidad: '1'
+    },
+    headers: {}
+  };
+  const res = makeRes();
+
+  await createPaymentHandler(req, res);
+
+  assert.equal(res.statusCode, 409);
+  assert.equal(res.body.success, false);
+  assert.equal(res.body.error, 'OUT_OF_STOCK');
+  assert.equal(res.body.message, 'No hay stock disponible');
+  assert.equal(fetchCalled, false);
+});
+
+test('create-payment sends trusted Tilopay payload without creating pending CRM orders', async () => {
   resetState();
   process.env.BETSY_API_KEY = 'betsy-key';
   process.env.BETSY_API_URL = 'https://betsy.test/orders';
@@ -161,6 +198,7 @@ test('create-payment sends trusted Tilopay payload and creates pending email aud
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.success, true);
   assert.equal(res.body.auditTrail.success, true);
+  assert.equal(res.body.auditTrail.channels.adminEmail.skipped, true);
   assert.equal(res.body.auditTrail.channels.betsy.skipped, true);
 
   const processPaymentCall = calls.find((call) => call.url.endsWith('/processPayment'));
@@ -172,6 +210,51 @@ test('create-payment sends trusted Tilopay payload and creates pending email aud
   assert.equal(payload.shipToEmail, 'ana@example.com');
   assert.ok(payload.returnData);
   assert.equal(calls.filter((call) => call.url === 'https://betsy.test/orders').length, 0);
+  assert.equal(calls.filter((call) => call.url === 'https://api.resend.com/emails').length, 0);
+});
+
+test('create-payment does not require pending notification email before returning payment URL', async () => {
+  resetState();
+  process.env.RESEND_API_KEY = '';
+  process.env.ORDER_NOTIFICATION_EMAIL = '';
+  const calls = [];
+
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+
+    if (String(url).endsWith('/login')) {
+      return Response.json({ access_token: 'token' });
+    }
+
+    if (String(url).endsWith('/processPayment')) {
+      return Response.json({ urlPaymentForm: 'https://tilopay.test/pay/123', id: 'TILO-1' });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+
+  const req = {
+    method: 'POST',
+    body: {
+      nombre: 'Ana Cliente',
+      telefono: '88888888',
+      email: 'ana@example.com',
+      provincia: 'San Jose',
+      canton: 'Central',
+      distrito: 'Carmen',
+      direccion: 'Calle 1',
+      cantidad: '1'
+    },
+    headers: {}
+  };
+  const res = makeRes();
+
+  await createPaymentHandler(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.success, true);
+  assert.equal(res.body.paymentUrl, 'https://tilopay.test/pay/123');
+  assert.equal(calls.filter((call) => call.url === 'https://api.resend.com/emails').length, 0);
 });
 
 test('approved redirect with valid returnData processes email and CRM independently', async () => {
@@ -217,6 +300,62 @@ test('approved redirect with valid returnData processes email and CRM independen
   assert.equal(calls.filter((call) => call.url === 'https://betsy.test/orders').length, 1);
   const betsyCall = calls.find((call) => call.url === 'https://betsy.test/orders');
   assert.equal(betsyCall.options.headers['Idempotency-Key'], `deepsleep/betsy-order/${order.orderId}`);
+  const betsyPayload = JSON.parse(betsyCall.options.body);
+  assert.equal(betsyPayload.payment.status, 'PAGADO');
+  assert.equal(betsyPayload.payment.fulfillmentStatus, 'PENDIENTE');
+});
+
+test('approved redirect finishes when Betsy is slow but email succeeds', async () => {
+  resetState();
+  process.env.BETSY_API_KEY = 'betsy-key';
+  process.env.BETSY_API_URL = 'https://betsy.test/orders';
+  process.env.BETSY_TIMEOUT_MS = '5';
+  process.env.FULFILLMENT_CHANNEL_TIMEOUT_MS = '50';
+  const calls = [];
+  const order = sampleOrder();
+  const returnData = encodeOrderReturnData(order);
+
+  global.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+
+    if (String(url) === 'https://api.resend.com/emails') {
+      return Response.json({ id: `email-${calls.length}` });
+    }
+
+    if (String(url) === 'https://betsy.test/orders') {
+      return new Promise((_, reject) => {
+        options.signal.addEventListener('abort', () => {
+          const error = new Error('Betsy request aborted');
+          error.name = 'AbortError';
+          reject(error);
+        });
+      });
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+
+  const req = {
+    method: 'POST',
+    body: {
+      orderId: order.orderId,
+      transactionId: 'TILO-SLOW-BETSY',
+      code: '1',
+      returnData
+    },
+    headers: {}
+  };
+  const res = makeRes();
+
+  await confirmHandler(req, res);
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.success, true);
+  assert.equal(res.body.status, 'approved_processed');
+  assert.equal(res.body.channelResults.email.success, true);
+  assert.equal(res.body.channelResults.betsy.success, false);
+  assert.equal(calls.filter((call) => call.url === 'https://api.resend.com/emails').length, 2);
+  assert.equal(calls.filter((call) => call.url === 'https://betsy.test/orders').length, 1);
 });
 
 test('approved redirect without transaction ID goes to manual review', async () => {

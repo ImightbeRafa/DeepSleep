@@ -73,7 +73,8 @@ export async function sendOrderToBetsy(orderData) {
       payment: {
         method: paymentMethod,
         transactionId: transactionId,
-        status: 'PENDIENTE', // Always PENDIENTE - order status, not payment status
+        status: paymentStatus,
+        fulfillmentStatus: 'PENDIENTE',
         date: new Date().toLocaleString('es-CR', {
           timeZone: 'America/Costa_Rica',
           year: 'numeric',
@@ -100,8 +101,9 @@ export async function sendOrderToBetsy(orderData) {
     console.log('🔑 [Betsy] Using API key:', apiKey.substring(0, 20) + '...');
 
     // Create timeout controller for compatibility
+    const betsyTimeoutMs = getBetsyTimeoutMs();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), betsyTimeoutMs);
     
     let response;
     try {
@@ -175,7 +177,7 @@ export async function sendOrderToBetsy(orderData) {
     
     // Check if it's a timeout
     if (error.name === 'AbortError') {
-      console.error('❌ [Betsy] Request timed out after 10 seconds');
+      console.error(`❌ [Betsy] Request timed out after ${getBetsyTimeoutMs()}ms`);
     }
     
     // Log error but don't throw - we don't want to fail the order
@@ -215,6 +217,11 @@ export async function sendOrderToBetsyWithRetry(orderData, maxRetries = 3) {
     console.error(`❌ [Betsy] Failed after ${attempt} attempts:`, result.error);
     return result;
   }
+}
+
+function getBetsyTimeoutMs() {
+  const configured = Number.parseInt(process.env.BETSY_TIMEOUT_MS || '', 10);
+  return Number.isInteger(configured) && configured > 0 ? configured : 5000;
 }
 
 function getBetsyIdempotencyKey(orderData) {

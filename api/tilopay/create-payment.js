@@ -2,6 +2,7 @@ import { sendMetaEvent, generateEventId } from '../utils/meta.js';
 import { encodeOrderReturnData } from '../utils/orderReturnData.js';
 import { generateOrderId, normalizeTrustedOrder } from '../utils/order.js';
 import { createPendingAuditTrail } from '../utils/fulfillment.js';
+import { getProductStockStatus } from '../utils/stock.js';
 
 async function authenticateTilopay() {
   const baseUrl = process.env.TILOPAY_BASE_URL || 'https://app.tilopay.com/api/v1';
@@ -59,6 +60,17 @@ export default async function handler(req, res) {
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const stockStatus = getProductStockStatus();
+
+  if (!stockStatus.inStock) {
+    console.warn('[Tilopay] Checkout blocked because PRODUCT_IN_STOCK is false.');
+    return res.status(409).json({
+      success: false,
+      error: 'OUT_OF_STOCK',
+      message: stockStatus.message
+    });
   }
 
   console.log('[Tilopay] Creating payment link...');
