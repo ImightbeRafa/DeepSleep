@@ -1,4 +1,4 @@
-import { sendOrderEmail, sendPendingOrderEmail, sendManualReviewAlert } from './email.js';
+import { sendOrderEmail, sendPendingOrderEmail, sendManualReviewAlert, sendSinpeOrderEmails } from './email.js';
 import { sendOrderToBetsyWithRetry } from './betsy.js';
 import { sendMetaEvent, generateEventId } from './meta.js';
 import { normalizePaidOrder, normalizeTrustedOrder } from './order.js';
@@ -283,4 +283,64 @@ export async function processPaidOrder(orderInput, options = {}) {
   };
 
   return result;
+}
+
+/**
+ * SINPE orders are recorded immediately (customer + admin email, Betsy) with a
+ * pending payment status. The order only counts as placed if at least one
+ * internal channel (admin email or Betsy) recorded it, so it can't get lost.
+ */
+export async function processSinpeOrder(orderInput, options = {}) {
+  ensureOrderStores();
+
+  const order = normalizeTrustedOrder({
+    ...orderInput,
+    paymentMethod: 'SINPE',
+    paymentStatus: 'pending'
+  });
+
+  const previous = global.pendingOrders[order.orderId];
+
+  if (previous?.processed && previous.paymentMethod === 'SINPE') {
+    return {
+      success: true,
+      alreadyProcessed: true,
+      order: previous,
+      channelResults: previous.channelResults || {}
+    };
+  }
+
+  const timeoutMs = getFulfillmentChannelTimeoutMs();
+  const [emailResult, betsyResult] = await Promise.allSettled([
+    withTimeout(sendSinpeOrderEmails(order), timeoutMs, 'SINPE email'),
+    withTimeout(sendOrderToBetsyWithRetry(order, getPaidBetsyRetryCount()), timeoutMs, 'SINPE Betsy')
+  ]);
+
+  const channelResults = {
+    email: summarizeResult(emailResult),
+    betsy: summarizeResult(betsyResult)
+  };
+  const recorded = Boolean(channelSucceeded(emailResult)) || Boolean(channelSucceeded(betsyResult));
+
+  if (!recorded) {
+    console.error('[SINPE] Order could not be recorded in any channel:', order.orderId, channelResults);
+    return {
+      success: false,
+      order,
+      channelResults
+    };
+  }
+
+  global.pendingOrders[order.orderId] = {
+    ...order,
+    processed: true,
+    fulfillmentStatus: 'sinpe_pending_payment',
+    channelResults
+  };
+
+  return {
+    success: true,
+    order,
+    channelResults
+  };
 }

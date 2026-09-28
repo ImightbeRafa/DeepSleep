@@ -22,6 +22,53 @@ export function normalizeQuantity(value) {
   return quantity;
 }
 
+const REQUIRED_FIELDS = ['nombre', 'telefono', 'email', 'provincia', 'canton', 'distrito', 'direccion', 'cantidad'];
+const FIELD_MAX_LENGTHS = {
+  nombre: 120,
+  telefono: 30,
+  email: 160,
+  provincia: 40,
+  canton: 80,
+  distrito: 80,
+  direccion: 500,
+  comentarios: 1000
+};
+
+/**
+ * Returns a customer-facing (Spanish) error message, or null when the input is valid.
+ */
+export function validateOrderInput(input) {
+  const body = input || {};
+
+  for (const field of REQUIRED_FIELDS) {
+    if (!String(body[field] ?? '').trim()) {
+      return 'Por favor complete todos los campos requeridos.';
+    }
+  }
+
+  for (const [field, maxLength] of Object.entries(FIELD_MAX_LENGTHS)) {
+    if (String(body[field] ?? '').length > maxLength) {
+      return 'Uno de los campos es demasiado largo.';
+    }
+  }
+
+  if (String(body.telefono).replace(/\D/g, '').length < 8) {
+    return 'Ingrese un número de teléfono válido (8 dígitos).';
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(body.email).trim())) {
+    return 'Ingrese un correo electrónico válido.';
+  }
+
+  try {
+    normalizeQuantity(body.cantidad);
+  } catch {
+    return `La cantidad debe estar entre 1 y ${MAX_QUANTITY}.`;
+  }
+
+  return null;
+}
+
 export function calculateTrustedTotals(value) {
   const cantidad = normalizeQuantity(value);
   const subtotal = PRODUCT.unitPrice * cantidad;

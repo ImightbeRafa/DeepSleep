@@ -1,4 +1,5 @@
 import { getProductStockStatus } from './utils/stock.js';
+import { getPublicSinpeConfig } from './utils/sinpe.js';
 
 export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -15,6 +16,14 @@ export default function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  return res.json(getProductStockStatus());
-}
+  const sinpe = getPublicSinpeConfig();
 
+  return res.json({
+    ...getProductStockStatus(),
+    paymentMethods: {
+      card: true,
+      sinpe: sinpe.enabled
+    },
+    sinpe
+  });
+}

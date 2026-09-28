@@ -1,3 +1,5 @@
+import { getSinpeConfig, buildSinpeWhatsAppUrl, formatColones } from './sinpe.js';
+
 /**
  * Resend idempotency keys are kept for 24 hours and prevent duplicate sends
  * when the success page and payment webhook process the same order.
@@ -129,8 +131,42 @@ async function sendResendEmail({ resendApiKey, idempotencyKey, payload }) {
   return await response.json();
 }
 
+function buildSinpeInstructionsHtml(order) {
+  const sinpe = getSinpeConfig();
+  const whatsappUrl = buildSinpeWhatsAppUrl(order, sinpe);
+
+  return `
+          <div style="background: #eff6ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2563eb;">
+            <h3 style="margin-top: 0; color: #1e3a8a;">Complete su pago por SINPE Movil</h3>
+            <div style="background: #fff; padding: 15px; border-radius: 6px; margin: 15px 0;">
+              <p style="margin: 5px 0;"><strong>Numero SINPE:</strong> <span style="font-size: 1.3em; color: #1d4ed8;">${escapeHtml(sinpe.number)}</span></p>
+              ${sinpe.name ? `<p style="margin: 5px 0;"><strong>A nombre de:</strong> ${escapeHtml(sinpe.name)}</p>` : ''}
+              <p style="margin: 5px 0;"><strong>Monto exacto:</strong> ${formatColones(order.total)}</p>
+              <p style="margin: 5px 0;"><strong>Concepto / descripcion:</strong> ${escapeHtml(order.orderId)}</p>
+            </div>
+            <ol style="margin: 10px 0; padding-left: 20px;">
+              <li>Abra la app de su banco y elija SINPE Movil.</li>
+              <li>Envie <strong>${formatColones(order.total)}</strong> al numero <strong>${escapeHtml(sinpe.number)}</strong>.</li>
+              <li>En el concepto escriba <strong>${escapeHtml(order.orderId)}</strong>.</li>
+              <li>Envienos el comprobante por WhatsApp para despachar su pedido.</li>
+            </ol>
+            <p style="text-align: center; margin: 20px 0 5px;">
+              <a href="${escapeHtml(whatsappUrl)}" style="display: inline-block; background: #25d366; color: #fff; padding: 12px 22px; border-radius: 8px; text-decoration: none; font-weight: bold;">Enviar comprobante por WhatsApp</a>
+            </p>
+          </div>
+  `;
+}
+
+function isPendingSinpe(order) {
+  return order.paymentMethod === 'SINPE' && order.paymentStatus !== 'completed';
+}
+
 async function sendCustomerEmail(order) {
   const { resendApiKey } = getNotificationConfig();
+  const pendingSinpe = isPendingSinpe(order);
+  const paymentBlock = pendingSinpe
+    ? buildSinpeInstructionsHtml(order)
+    : '<p>Su pago con tarjeta ha sido procesado exitosamente.</p>';
 
   const customerEmailHtml = `
     <!DOCTYPE html>
@@ -156,9 +192,9 @@ async function sendCustomerEmail(order) {
           <p style="color: white; margin: 10px 0 0 0; opacity: 0.9;">Bucal Anti-Ronquidos</p>
         </div>
         <div class="content">
-          <h2>Confirmacion de Pedido</h2>
+          <h2>${pendingSinpe ? 'Pedido recibido - pendiente de pago' : 'Confirmacion de Pedido'}</h2>
           <p>Hola <strong>${escapeHtml(order.nombre)}</strong>,</p>
-          <p>Gracias por tu pedido. Aqui estan los detalles:</p>
+          <p>${pendingSinpe ? 'Gracias por tu pedido. Reservamos tu DeepSleep; lo despachamos apenas confirmemos tu SINPE.' : 'Gracias por tu pedido. Aqui estan los detalles:'}</p>
           <div class="order-box">
             <p><span class="label">Orden:</span> ${escapeHtml(order.orderId)}</p>
             <p><span class="label">Producto:</span> ${escapeHtml(order.productName || 'DeepSleep Bucal Anti-Ronquidos')}</p>
@@ -167,13 +203,13 @@ async function sendCustomerEmail(order) {
             <p><span class="label">Envio:</span> ${formatCurrency(order.shippingCost)}</p>
             <p><span class="label">Total:</span> ${formatCurrency(order.total)}</p>
           </div>
-          <p>Su pago con tarjeta ha sido procesado exitosamente.</p>
+          ${paymentBlock}
           <div class="order-box">
             <p><strong>Direccion de Envio:</strong></p>
             <p>${escapeHtml(order.direccion)}<br>${escapeHtml(order.distrito)}, ${escapeHtml(order.canton)}, ${escapeHtml(order.provincia)}</p>
           </div>
           <p style="text-align: center; margin: 30px 0;">
-            <strong>Te contactaremos pronto para coordinar la entrega.</strong>
+            <strong>${pendingSinpe ? 'Apenas recibamos tu comprobante te confirmamos el envio.' : 'Te contactaremos pronto para coordinar la entrega.'}</strong>
           </p>
         </div>
         <div class="footer">
@@ -191,11 +227,13 @@ async function sendCustomerEmail(order) {
 
   return sendResendEmail({
     resendApiKey,
-    idempotencyKey: getEmailIdempotencyKey(order, 'customer'),
+    idempotencyKey: getEmailIdempotencyKey(order, pendingSinpe ? 'sinpe-customer' : 'customer'),
     payload: {
       from: 'DeepSleep <ordenes@betsycrm.com>',
       to: order.email,
-      subject: `Confirmacion de Pedido ${order.orderId} - DeepSleep`,
+      subject: pendingSinpe
+        ? `Pedido ${order.orderId} recibido - datos para pagar por SINPE`
+        : `Confirmacion de Pedido ${order.orderId} - DeepSleep`,
       html: customerEmailHtml
     }
   });
@@ -356,7 +394,7 @@ export async function sendManualReviewAlert({ orderId, transactionId, source, re
   });
 }
 
-export async function sendOrderEmail(order) {
+export async function sendOrderEmail(order, options = {}) {
   getNotificationConfig();
 
   const results = {
@@ -374,11 +412,24 @@ export async function sendOrderEmail(order) {
     }
   }
 
-  results.admin = await sendAdminEmail(order);
+  results.admin = await sendAdminEmail(order, options.admin);
   console.log('Admin email sent');
 
   return {
     success: true,
     results
   };
+}
+
+export async function sendSinpeOrderEmails(order) {
+  const total = formatCurrency(order.total);
+
+  return sendOrderEmail(order, {
+    admin: {
+      emailType: 'sinpe-admin',
+      heading: `Nuevo pedido SINPE (pendiente de pago) - ${order.orderId}`,
+      subject: `SINPE pendiente: ${order.orderId} - ${order.nombre} - ${total}`,
+      intro: `Verifique que entre un SINPE por ${total} con concepto ${order.orderId} antes de despachar. El cliente enviara el comprobante por WhatsApp.`
+    }
+  });
 }

@@ -1,6 +1,6 @@
 import { sendMetaEvent, generateEventId } from '../utils/meta.js';
 import { encodeOrderReturnData } from '../utils/orderReturnData.js';
-import { generateOrderId, normalizeTrustedOrder } from '../utils/order.js';
+import { generateOrderId, normalizeTrustedOrder, validateOrderInput } from '../utils/order.js';
 import { createPendingAuditTrail } from '../utils/fulfillment.js';
 import { getProductStockStatus } from '../utils/stock.js';
 
@@ -88,9 +88,12 @@ export default async function handler(req, res) {
       comentarios
     } = req.body || {};
 
-    if (!nombre || !telefono || !email || !provincia || !canton || !distrito || !direccion || !cantidad) {
+    const validationError = validateOrderInput(req.body);
+
+    if (validationError) {
       return res.status(400).json({
-        error: 'Missing required fields'
+        error: 'Missing required fields',
+        message: validationError
       });
     }
 

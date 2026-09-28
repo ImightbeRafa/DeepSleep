@@ -34,7 +34,11 @@ export async function sendOrderToBetsy(orderData) {
     
     // Build payment status comment
     let paymentComment = '';
-    if (paymentStatus === 'PAGADO') {
+    if (paymentMethod === 'SINPE') {
+      paymentComment = paymentStatus === 'PAGADO'
+        ? `Pago: SINPE Móvil - Estado: PAGADO - Referencia: ${transactionId}`
+        : `Pago: SINPE Móvil - Estado: PENDIENTE de confirmación - Verificar SINPE por ₡${Number(orderData.total || 0).toLocaleString('es-CR')} con concepto ${orderData.orderId}`;
+    } else if (paymentStatus === 'PAGADO') {
       paymentComment = `Pago: Tarjeta (Tilopay) - Estado: PAGADO - ID Transacción: ${transactionId}`;
     } else {
       paymentComment = `Pago: Tarjeta (Tilopay) - Estado: Pendiente`;

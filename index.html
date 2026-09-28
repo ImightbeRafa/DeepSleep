@@ -67,7 +67,7 @@
             <div class="hero-grid">
                 <div class="hero-content">
                     <div class="badge-new">✨ Solución Comprobada</div>
-                    <h2 class="hero-title">Duerme Profundamente,<br>Sin Ronquidos</h2>
+                    <h1 class="hero-title">Duerme Profundamente,<br>Sin Ronquidos</h1>
                     <p class="hero-subtitle">Bucal anti-ronquidos de grado médico.</p>
                     
                     <div class="hero-features">
@@ -96,7 +96,8 @@
                             <span class="price-label">Precio especial:</span>
                             <span class="price">₡9.900</span>
                         </div>
-                        <span class="shipping-badge">🚛 Envío a todo Costa Rica: ₡3,000 por pedido</span>
+                        <span class="shipping-badge">🚛 Envío a todo Costa Rica: ₡3.000 por pedido</span>
+                        <span class="payment-badges">Pagá con 💳 tarjeta o 📱 SINPE Móvil</span>
                         <span class="urgency-text">⏰ Oferta válida por tiempo limitado</span>
                     </div>
                     
@@ -303,106 +304,130 @@
     <section id="pedido" class="order-section">
         <div class="container">
             <div class="section-header">
-                <h2>Pedir tu DeepSleep</h2>
-                <p class="section-description">Es muy fácil, completa el formulario y te contactaremos pronto 🛍️</p>
+                <h2>Pedí tu DeepSleep</h2>
+                <p class="section-description">Completá tus datos y elegí cómo pagar: tarjeta o SINPE Móvil 🛍️</p>
             </div>
-            
+
             <div class="order-container">
-                <div class="order-summary">
+                <aside class="order-summary" aria-label="Resumen del pedido">
                     <div class="product-image-container">
-                        <img src="/images/product.png" alt="DeepSleep Bucal Anti-Ronquidos" class="summary-product-image">
+                        <img src="/images/product.png" alt="DeepSleep Bucal Anti-Ronquidos" class="summary-product-image" loading="lazy">
                     </div>
                     <h3>Resumen del Pedido</h3>
-                    <div class="summary-item">
-                        <span>Bucal Anti-Ronquidos DeepSleep</span>
-                        <span>₡9,900</span>
+                    <div class="summary-item summary-product">
+                        <span>Bucal DeepSleep <span class="summary-qty">× 1</span></span>
+                        <span class="summary-subtotal">₡9.900</span>
                     </div>
-                    <div class="summary-item summary-savings" style="display: none;">
-                        <span>Ahorro por compra múltiple 🎉</span>
-                        <span class="savings-amount">-₡0</span>
-                    </div>
-                    <div class="summary-item">
-                        <span>Envío</span>
-                        <span>₡3,000</span>
+                    <div class="summary-item summary-shipping">
+                        <span>Envío (Correos de Costa Rica)</span>
+                        <span class="summary-shipping-cost">₡3.000</span>
                     </div>
                     <div class="summary-total">
                         <span>Total</span>
-                        <span>₡12,900</span>
+                        <span class="summary-total-amount">₡12.900</span>
                     </div>
-                </div>
-                
+
+                    <ul class="trust-list">
+                        <li><span aria-hidden="true">🔒</span> Pago con tarjeta procesado por <strong>Tilopay</strong>. No guardamos los datos de tu tarjeta.</li>
+                        <li><span aria-hidden="true">📱</span> También podés pagar por <strong>SINPE Móvil</strong>.</li>
+                        <li><span aria-hidden="true">📦</span> Envío a todo Costa Rica en 3-5 días hábiles.</li>
+                        <li><span aria-hidden="true">💬</span> ¿Dudas? <a href="https://wa.me/50662019914" target="_blank" rel="noopener noreferrer">Escribinos por WhatsApp</a></li>
+                    </ul>
+                </aside>
+
                 <div id="stock-message" class="stock-message" hidden></div>
 
-                <form id="order-form" class="order-form">
-                    <h3>Información de Envío</h3>
-                    
-                    <div class="form-row">
+                <form id="order-form" class="order-form" novalidate>
+                    <div id="form-message" class="form-message" role="alert" aria-live="polite" hidden></div>
+
+                    <fieldset class="form-step">
+                        <legend><span class="step-badge">1</span> Tus datos</legend>
                         <div class="form-group">
-                            <label for="nombre">Nombre Completo *</label>
-                            <input type="text" id="nombre" name="nombre" required>
+                            <label for="nombre">Nombre completo *</label>
+                            <input type="text" id="nombre" name="nombre" autocomplete="name" maxlength="120" required>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="telefono">Teléfono *</label>
-                            <input type="tel" id="telefono" name="telefono" required>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="telefono">Teléfono / WhatsApp *</label>
+                                <input type="tel" id="telefono" name="telefono" autocomplete="tel-national" inputmode="tel" placeholder="8888-8888" maxlength="30" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="email">Email *</label>
+                                <input type="email" id="email" name="email" autocomplete="email" inputmode="email" placeholder="tu@correo.com" maxlength="160" required>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="email">Email *</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
-                    
-                    <div class="form-row">
+                    </fieldset>
+
+                    <fieldset class="form-step">
+                        <legend><span class="step-badge">2</span> Dirección de envío</legend>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="provincia">Provincia *</label>
+                                <select id="provincia" name="provincia" autocomplete="address-level1" required>
+                                    <option value="">Seleccioná</option>
+                                    <option value="San José">San José</option>
+                                    <option value="Alajuela">Alajuela</option>
+                                    <option value="Cartago">Cartago</option>
+                                    <option value="Heredia">Heredia</option>
+                                    <option value="Guanacaste">Guanacaste</option>
+                                    <option value="Puntarenas">Puntarenas</option>
+                                    <option value="Limón">Limón</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="canton">Cantón *</label>
+                                <input type="text" id="canton" name="canton" autocomplete="address-level2" maxlength="80" required>
+                            </div>
+                        </div>
                         <div class="form-group">
-                            <label for="provincia">Provincia *</label>
-                            <select id="provincia" name="provincia" required>
-                                <option value="">Selecciona</option>
-                                <option value="San José">San José</option>
-                                <option value="Alajuela">Alajuela</option>
-                                <option value="Cartago">Cartago</option>
-                                <option value="Heredia">Heredia</option>
-                                <option value="Guanacaste">Guanacaste</option>
-                                <option value="Puntarenas">Puntarenas</option>
-                                <option value="Limón">Limón</option>
+                            <label for="distrito">Distrito *</label>
+                            <input type="text" id="distrito" name="distrito" autocomplete="address-level3" maxlength="80" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="direccion">Dirección exacta *</label>
+                            <textarea id="direccion" name="direccion" rows="2" autocomplete="street-address" placeholder="Ej: 200 m norte de la iglesia, casa azul portón negro" maxlength="500" required></textarea>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="form-step">
+                        <legend><span class="step-badge">3</span> Cantidad y pago</legend>
+                        <div class="form-group">
+                            <label for="cantidad">Cantidad *</label>
+                            <select id="cantidad" name="cantidad" required>
+                                <option value="1">1 unidad</option>
+                                <option value="2">2 unidades</option>
+                                <option value="3">3 unidades</option>
+                                <option value="4">4 unidades</option>
+                                <option value="5">5 unidades</option>
                             </select>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="canton">Cantón *</label>
-                            <input type="text" id="canton" name="canton" required>
+
+                        <div class="payment-options" role="radiogroup" aria-label="Método de pago">
+                            <label class="payment-option">
+                                <input type="radio" name="metodoPago" value="card" checked>
+                                <span class="payment-option-body">
+                                    <span class="payment-option-title">💳 Tarjeta de crédito o débito</span>
+                                    <span class="payment-option-desc">Pago inmediato y seguro con Tilopay.</span>
+                                </span>
+                            </label>
+                            <label class="payment-option" id="payment-option-sinpe" hidden>
+                                <input type="radio" name="metodoPago" value="sinpe">
+                                <span class="payment-option-body">
+                                    <span class="payment-option-title">📱 SINPE Móvil</span>
+                                    <span class="payment-option-desc">Te damos el número y el monto exacto. Enviás el comprobante por WhatsApp.</span>
+                                </span>
+                            </label>
                         </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="distrito">Distrito *</label>
-                        <input type="text" id="distrito" name="distrito" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="direccion">Dirección *</label>
-                        <textarea id="direccion" name="direccion" rows="2" placeholder="Dirección exacta con señas" required></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="cantidad">Cantidad *</label>
-                        <select id="cantidad" name="cantidad" required>
-                            <option value="1">1 unidad</option>
-                            <option value="2">2 unidades</option>
-                            <option value="3">3 unidades</option>
-                            <option value="4">4 unidades</option>
-                            <option value="5">5 unidades</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="comentarios">Comentarios (opcional)</label>
-                        <textarea id="comentarios" name="comentarios" rows="2"></textarea>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary btn-submit">Enviar Pedido</button>
-                    
-                    <p class="form-note">* Recibirá un correo con las instrucciones de pago y la confirmación de su pedido.</p>
+
+                        <div class="form-group">
+                            <label for="comentarios">Comentarios (opcional)</label>
+                            <textarea id="comentarios" name="comentarios" rows="2" maxlength="1000"></textarea>
+                        </div>
+                    </fieldset>
+
+                    <button type="submit" class="btn btn-primary btn-submit">Pagar ₡12.900 con tarjeta</button>
+
+                    <p class="form-note" id="form-note">🔒 Serás redirigido a la pasarela segura de Tilopay para completar el pago.</p>
                 </form>
             </div>
         </div>
@@ -427,7 +452,7 @@
     <!-- Footer -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 DeepSleep. Todos los derechos reservados.</p>
+            <p>&copy; <span id="footer-year">2026</span> DeepSleep. Todos los derechos reservados.</p>
             <p class="footer-links">
                 <a href="https://wa.me/50662019914" target="_blank" rel="noopener noreferrer">WhatsApp</a>
                 <span>•</span>
@@ -440,7 +465,7 @@
     <div id="loading-overlay" class="loading-overlay" style="display: none;">
         <div class="loading-spinner">
             <div class="spinner"></div>
-            <p>Procesando su pedido...</p>
+            <p id="loading-text">Procesando su pedido...</p>
         </div>
     </div>
 
