@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 
 // Accept a few common spellings so the production env names don't have to change.
-const NUMBER_ENV_NAMES = ['SINPE_NUMBER', 'SINPE_NUMERO', 'SINPE_PHONE', 'SINPE_MOVIL_NUMBER', 'SINPE_TELEFONO'];
-const NAME_ENV_NAMES = ['SINPE_NAME', 'SINPE_NOMBRE', 'SINPE_OWNER', 'SINPE_OWNER_NAME', 'SINPE_HOLDER_NAME', 'SINPE_MOVIL_NAME'];
+const NUMBER_ENV_NAMES = ['SINPE_MOVIL', 'SINPE_NUMBER', 'SINPE_NUMERO', 'SINPE_PHONE', 'SINPE_MOVIL_NUMBER', 'SINPE_TELEFONO'];
+const NAME_ENV_NAMES = ['SINPE_HOLDER', 'SINPE_NAME', 'SINPE_NOMBRE', 'SINPE_OWNER', 'SINPE_OWNER_NAME', 'SINPE_HOLDER_NAME', 'SINPE_MOVIL_NAME'];
 const DEFAULT_WHATSAPP = '50662019914';
 
 // No 0/O/1/I/L so the code is easy to type in the SINPE "concepto" field.

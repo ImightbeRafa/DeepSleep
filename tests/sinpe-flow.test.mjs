@@ -21,8 +21,10 @@ function resetState(overrides = {}) {
     META_CAPI_ACCESS_TOKEN: '',
     PRODUCT_IN_STOCK: 'TRUE',
     OUT_OF_STOCK_MESSAGE: 'No hay stock disponible',
-    SINPE_NUMBER: '8888 7777',
-    SINPE_NAME: 'Nombre Prueba',
+    SINPE_MOVIL: '8888 7777',
+    SINPE_HOLDER: 'Nombre Prueba',
+    SINPE_NUMBER: '',
+    SINPE_NAME: '',
     SINPE_WHATSAPP: '',
     SINPE_ENABLED: '',
     ...overrides
@@ -101,7 +103,7 @@ test('SINPE config reads number/name from env and formats the number', () => {
 });
 
 test('SINPE config accepts alternative env names', () => {
-  resetState({ SINPE_NUMBER: '', SINPE_NAME: '', SINPE_NUMERO: '+506 7000 1111', SINPE_NOMBRE: 'Otro' });
+  resetState({ SINPE_MOVIL: '', SINPE_HOLDER: '', SINPE_NUMERO: '+506 7000 1111', SINPE_NOMBRE: 'Otro' });
   const config = getSinpeConfig();
   assert.equal(config.number, '7000-1111');
   assert.equal(config.name, 'Otro');
@@ -127,7 +129,7 @@ test('stock-status exposes SINPE details only when configured', () => {
   assert.equal(res.body.paymentMethods.sinpe, true);
   assert.equal(res.body.sinpe.number, '8888-7777');
 
-  resetState({ SINPE_NUMBER: '' });
+  resetState({ SINPE_MOVIL: '' });
   res = makeRes();
   stockStatusHandler({ method: 'GET' }, res);
   assert.equal(res.body.paymentMethods.sinpe, false);
@@ -225,7 +227,7 @@ test('SINPE checkout is blocked when out of stock or SINPE is not configured', a
   assert.equal(res.statusCode, 409);
   assert.equal(res.body.error, 'OUT_OF_STOCK');
 
-  resetState({ SINPE_NUMBER: '' });
+  resetState({ SINPE_MOVIL: '' });
   res = makeRes();
   await sinpeCreateOrderHandler({ method: 'POST', body: orderBody(), headers: {} }, res);
   assert.equal(res.statusCode, 503);
